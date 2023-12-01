@@ -1,0 +1,121 @@
+---
+title: "metaG_Beta"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr", "vegan", "ggplot2", "RColorBrewer")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+list.of.bioc <- c("phyloseq",  "grDevices", "microbiome", "ggpubr")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+library(phyloseq)
+library(dplyr)
+library(microbiome)
+library(vegan)
+library(RColorBrewer)
+library(cowplot)
+
+set.seed(435)
+```
+
+Load metadata + datasets
+```{r}
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+all.g<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+```
+Chekf it the meta SapleID match with the one in the genus table.
+
+```{r}
+dim(meta)
+dim(all.g)
+
+# are all samples in meta in the OTU table?
+stopifnot(all(meta$SampleID %in% names(all.g)))
+all(meta$SampleID %in% names(all.g))
+```
+
+# Beta
+Using BC dissimilarities
+```{r, fig.width = 10, fig.height = 10}
+# add a rowname to meta
+rownames(meta)<-meta$SampleID
+all_phylo<-phyloseq(otu_table(all.g,taxa_are_rows = T), sample_data(meta))
+
+all_bc<-phyloseq::distance(all_phylo, method = "bray", square = T)
+
+# Permanova
+perm<-how(blocks = as.factor(meta$Study), nperm = 999)
+
+# Test disease
+(a.perst.bc<-adonis2(all_bc ~ PD, data = microbiome::meta(all_phylo), permutations = perm))
+
+# Test Study
+(a.st.bc<-adonis2(all_bc ~ Study, data = microbiome::meta(all_phylo)))
+
+```
+
+# Ordination conditioned by study
+```{r}
+nb.cols <- 3
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+ 
+all_dbrda_bc<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo ~ 1  + Condition(Study))
+plot_ordination(all_phylo, all_dbrda_bc, "samples", shape="PD", color = "Study") +
+                theme_bw() +
+                scale_fill_manual(values = mycolors) +
+                geom_point(size = 2.5) +
+                labs(color = "Study", shape = "Status") +
+                theme(legend.title = element_text(size = 12, face = "bold"),
+                      legend.text = element_text(size = 12)) +
+    ggtitle("dbRDA-Conditioned Study - BC")
+
+# Export ordination data fro plotting with 16S
+sc<-scores(all_dbrda_bc, display = "sites") %>% as.data.frame()
+meta<-meta[order(meta$SampleID),]
+all(rownames(sc) == meta$SampleID)
+
+sc.m<-cbind.data.frame(sc, meta)
+saveRDS(sc.m, "/metaG/R_analyses/Taxonomy/RDS/dbRDA_df.rds")
+
+
+```
+
+# Ordination not conditioned
+```{r}
+all_dbrda_bc<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo ~ 1)
+
+# Quick plot
+plot_ordination(all_phylo, all_dbrda_bc, "samples", shape="PD", color = "Study") +
+                theme_bw() +
+                scale_fill_manual(values = mycolors) +
+                geom_point(size = 2.5) +
+                labs(color = "Study", shape = "Status") +
+                theme(legend.title = element_text(size = 12, face = "bold"),
+                      legend.text = element_text(size = 12)) +
+    ggtitle("dbRDA NOT-Conditioned Study - BC")
+
+
+# Export ordination data fro plotting with 16S
+sc<-scores(all_dbrda_bc, display = "sites") %>% as.data.frame() # extract the coordinates
+meta<-meta[order(meta$SampleID),]
+all(rownames(sc) == meta$SampleID)
+
+sc.m<-cbind.data.frame(sc, meta)
+saveRDS(sc.m, "/metaG/R_analyses/Taxonomy/RDS/dbRDA_df_study.rds")
+```
+Save workspace
+```{r}
+d<-"/metaG//R_analyses/Taxonomy/RData/"
+save.image(paste0(d, "metaG_beta.RData"))
+```

@@ -1,0 +1,125 @@
+---
+title: "metaG_Figs"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+#Load the data
+
+```{r}
+# clr
+s5<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+s10<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_10per_log.rds")
+s20<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_20per_log.rds")
+s30<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_30per_log.rds")
+
+#clr
+s5c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_clr.rds")
+s10c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_10per_clr.rds")
+s20c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_20per_clr.rds")
+s30c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_30per_clr.rds")
+s30c$prev<-rep("30% in 2 std", nrow(s30c))
+```
+
+```{r}
+# estimate the number of features left
+length(readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_5x10.rds")) 
+length(readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_10x10.rds"))
+length(readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_20x10.rds")) 
+length(readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_30x10.rds"))
+
+
+# rename
+
+s5$prev<-rep("5% in 2 studies (1808 feat.)", length = nrow(s5))
+s10$prev<-rep("10% in 2 studies (1263 feat.)", length = nrow(s10))
+s20$prev<-rep("20% in 2 studies (821 feat.)", length = nrow(s20))
+s30$prev<-rep("30% in 2 studies (576 feat.)", length = nrow(s30))
+
+s5c$prev<-rep("5% in 2 studies (1808 feat.)", length = nrow(s5c))
+s10c$prev<-rep("10% in 2 studies (1263 feat.)", length = nrow(s10c))
+s20c$prev<-rep("20% in 2 studies (821 feat.)", length = nrow(s20c))
+s30c$prev<-rep("30% in 2 studies (576 feat.)", length = nrow(s30c))
+
+
+df<-rbind.data.frame(s5, s10, s20, s30, s5c, s10c, s20c, s30c)
+df$prev<-factor(df$prev,
+                levels = c("5% in 2 studies (1808 feat.)", 
+                           "10% in 2 studies (1263 feat.)", 
+                           "20% in 2 studies (821 feat.)", 
+                           "30% in 2 studies (576 feat.)"))
+
+
+g<-ggplot(df, aes(prev, AUC, fill=norm)) +
+  geom_boxplot() +
+  facet_wrap(~ML, nrow = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  scale_fill_manual(values = c("#A669EE", "#CC79A7")) +
+  xlab("Prevalence filtration")
+g
+ggsave(filename = "//metaG/R_analyses/Taxonomy/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
+
+```
+
+#CSV
+
+```{r}
+
+perf_sing_log<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+#take only 5%
+perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
+perf_sing_log$batch<-rep("Not corrected", nrow(perf_sing_log))
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+
+
+csv_log<-readRDS("/metaG/R_analyses/Taxonomy/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+
+df_comb<-rbind.data.frame(perf_log, csv_log)
+
+
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2)*100
+
+df.diag<-df_comb[1:42,]
+
+r<-ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "right") +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
+  facet_wrap(~ ML)
+
+r
+ggsave(plot = r, filename = "/metaG/R_analyses/Taxonomy/Figures/CSV_5perc_log.jpeg", 
+       device = "jpeg", 
+       width = 10, 
+       height = 8)
+
+```
+
+

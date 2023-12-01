@@ -1,0 +1,346 @@
+---
+title: "Figures DA"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Load data
+```{r}
+library(ggplot2)
+library(dplyr)
+l_df<-readRDS("/metaG//R_analyses/Taxonomy/RDS/l.df_g_TSS.rds")
+meta<-readRDS("/metaG//R_analyses/Taxonomy/RDS/meta.rds")
+df.cross<-readRDS("/metaG//R_analyses/Taxonomy/RDS/df.cross.rds")
+df.sign<-readRDS("/metaG//R_analyses/Taxonomy/RDS/df.sign.rds")
+
+meta$PD[meta$PD == "HC"]<-"CTRL"
+```
+Load the families
+```{r}
+load(url("https://github.com/AlessioMilanese/motus_taxonomy/blob/master/data/motus_taxonomy_3.0.1.Rdata?raw=true"))
+head(motus3.0_taxonomy)
+
+# select families I have in the DA
+df.sign$motus<-gsub("[]]", "", gsub("[[]","", gsub(".*[[]", "[", df.sign$bins)))
+fam<-subset(motus3.0_taxonomy, mOTUs_ID %in% df.sign$motus)
+
+df.sign<-df.sign[order(df.sign$motus),]
+fam<-fam[order(fam$mOTUs_ID),]
+
+all(df.sign$motus == fam$mOTUs_ID)
+
+df.sign<-cbind.data.frame(df.sign, fam)
+
+
+
+df.sign<-df.sign %>%
+  group_by(Family) %>%
+  mutate(counts = n())
+
+df.sign<-df.sign[order(df.sign$counts, decreasing = T),]
+df.sign$counts %>% unique()
+df.sign$Family<-as.character(df.sign$Family)
+df.sign$Family<-gsub("[0-9]*", "", df.sign$Family)
+df.sign$Family<-gsub("NA*", "", df.sign$Family)
+
+df.sign$Family_short<-ifelse(df.sign$counts > 2, as.character(df.sign$Family), "Others")
+
+
+```
+
+Match motus with GTDB genera
+```{r}
+
+
+mgtdb<-read.delim("/R_analyses_metaG/mOTUs_3.0.0_GTDB_tax.tsv", header = F)
+
+df.sign$motus<-gsub("[]]", "", sub(".* [[]", "", df.sign$bins))
+df.sign$Genus<-vector(length = nrow(df.sign))
+
+for(i in 1:nrow(df.sign)){
+  df.sign$Genus[i]<-mgtdb[grep(df.sign$motus[i], mgtdb$V1), "V7"]
+}
+saveRDS(df.sign, "/metaG/R_analyses/Taxonomy/RDS/df.sign,gtdb.rds")
+df.sign$dir[df.sign$dir == "HC"]<-"CTRL"
+
+```
+
+Make a pretty graph
+```{r}
+
+library(RColorBrewer)
+library(ggnewscale)
+
+# load the df.sign 16S and match with metag
+df.16<-readRDS("/16S/R_analyses/RDS/df.sign.rds")
+
+df.sign$bold<-vector(length = nrow(df.sign))
+df.sign$DA_16SSMG<-vector(length = nrow(df.sign))
+
+bins<-df.sign$Genus
+for(i in 1:nrow(df.sign)){
+  df.sign$bold[i]<-ifelse(df.sign$Genus[i] %in% df.16$bins, "bold", "plain")
+  # check direction of enrichment
+  if(df.sign$Genus[i] %in% df.16$bins){
+     DAmg<-df.sign[df.sign$Genus == bins[i],]$TE.random
+     DA16s<-df.16[df.16$bins == bins[i],]$TE.random 
+     DA.match<-ifelse(DA16s > 0 & all(DAmg > 0) | DA16s < 0 & all(DAmg < 0), "Same_DA", "Opposite_DA" )
+     df.sign$DA_16SSMG[i]<-DA.match
+
+     
+  } else {df.sign$DA_16SSMG[i]<-"NA"}
+}
+# Select the taxa with opposite dir
+gen<-subset(df.sign, DA_16SSMG == "Opposite_DA")$Genus
+View(df.sign[df.sign$Genus %in% gen,])
+# This is due to the fact that there is one mOTU pos and one negative. This needs to be included in the figure
+
+df.sign$dirDA<-rep("black", length = nrow(df.sign))
+# now add the red for the divergent mOTUs
+df.sign[df.sign$Genus %in% gen,]$dirDA<-"red"
+
+
+l<-length(unique(df.sign$Family_short))
+mycolors <- colorRampPalette(brewer.pal(8, "Set3"))(l)
+df.sign$taxa<-gsub("species incertae sedis", "sp.", df.sign$bins)
+df.sign$taxa<-gsub(" [[].*mOTU_v3_", " [", df.sign$taxa)
+df.sign2<-df.sign
+
+library(cowplot)
+# make titles
+title <- ggdraw() + 
+  draw_label(
+    "Differentially abundant mOTUs between CTRL and PD",
+    fontface = 'bold',
+    x = 0.05,
+    y = 0.7,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+subtitle <- ggdraw() + 
+  draw_label(
+    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1325",size = 12,
+    x = 0.05, y = 0.7,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+
+
+
+
+#Single study DA
+df.cross.adj<-df.cross %>%
+  group_by(Cohort) %>%
+  mutate(padjust = p.adjust( p.value, method = "fdr"))
+# add 1 for each sign for counting
+df.cross.adj$counts<-ifelse(df.cross.adj$padjust < 0.05 & df.cross.adj$estimate > 0, 1, 0)
+df.cross.adj$counts.hc<-ifelse(df.cross.adj$padjust < 0.05 & df.cross.adj$estimate < 0, 1, 0)
+
+# sum for genera
+df.cross.adj<- df.cross.adj %>%
+  group_by(bin) %>%
+  mutate(tot.sign.taxa = sum(counts),
+         tot.sign.taxa.hc = sum(counts.hc))
+
+df.sign.uniq<-subset(df.cross.adj[!duplicated(df.cross.adj$bin),], bin %in% df.sign$bins)
+df.sign<-df.sign[order(df.sign$TE.random, decreasing = T),]
+df.sign.uniq<-df.sign.uniq %>% arrange(factor(bin, levels = df.sign$bins))
+
+df.sign.uniq$TE<-vector(length = nrow(df.sign.uniq))
+for(i in 1:nrow(df.sign.uniq)){
+  df.sign.uniq$TE[i]<-df.sign[which(df.sign$bins == df.sign.uniq$bin[i]),]$TE.random
+}
+df.sign.uniq$bin<-factor(df.sign.uniq$bin, levels = unique(df.sign.uniq$bin))
+
+
+(s.g<-
+ggplot(df.sign.uniq, aes(x = tot.sign.taxa, y =reorder(bin, -TE))) +
+      geom_bar(mapping = aes(x = tot.sign.taxa + tot.sign.taxa.hc, y =reorder(bin, -TE)), stat = "identity", fill = "#525266", color = "black", size = 0.5) +
+  geom_bar(stat = "identity", fill = "#ff6666", color = "black", size = 0.5) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank()) +
+  labs(y = "Genera",
+       x = "#Studies")+
+      scale_x_continuous(breaks = c(0,1,2,3), limits = c(0,3)))
+# add the ML coefficients
+df.pos.neg<-readRDS("/metaG//R_analyses/Taxonomy/RDS/Ridge_df.pos.neg.rds")
+df.pos.neg<-subset(df.pos.neg, taxa %in% df.sign$bins)
+
+# Format for plotting
+df.pos.neg$taxa<-factor(df.pos.neg$taxa, levels = df.sign$bins, ordered = T)
+
+# add dir of enrichment 
+df.pos.neg$dir<-vector(length = nrow(df.pos.neg))
+for(i in 1:nrow(df.pos.neg)){
+  df.pos.neg$dir[i]<-df.sign[df.sign$bins == df.pos.neg$taxa[i],]$dir
+}
+
+(ridge.ef<-ggplot(df.pos.neg, aes( x = -average, y = taxa)) +
+        geom_errorbarh(mapping = aes(xmin = -average - stdev, 
+                                     xmax = -average + stdev), 
+                                     height = 0.3,
+                                     linewidth = 0.3) +
+        geom_point(size = 4, pch = 21, mapping = aes(fill = factor(dir))) +
+        scale_fill_manual(values = c("#525266","#ff6666")) +
+        theme_bw() +
+        theme(axis.text.y = element_blank(),
+              axis.text.x = element_text(size = 13),
+              axis.ticks.y = element_blank(),
+              axis.title.y = element_blank(),
+              legend.position = "none") +
+        geom_vline(xintercept = 0, colour = "gray", linetype=2) +
+    xlab("Relative average coeff.")
+)
+
+(g<-ggplot(df.sign, aes(x = TE.random, y = reorder(taxa, -TE.random))) +
+  geom_errorbar(aes(xmin=lower.random, xmax=upper.random), width=.5) +
+  geom_point(pch = 21, size = 5, alpha = 1, mapping = aes(fill = dir), stroke = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#525266", "#ff6666")) +
+  labs(fill = "Condition",
+       y = "mOTUs",
+       x = "Gen. Odds") +
+  geom_hline(yintercept = 0, colour = "gray", linetype=2) +
+  geom_vline(xintercept = 0, colour = "gray", linetype=2) +
+  new_scale_fill() +
+  geom_tile(data = df.sign2, aes(x = -0.8, 
+                                 y = reorder(taxa, -TE.random), 
+                                 fill = Family_short, 
+                                 width = 0.05)) +
+  scale_fill_manual(values = mycolors) +
+  theme(legend.position = "right",
+        legend.key.size = unit(0.4, "cm"),
+        legend.direction = "vertical") +
+  theme(axis.title.y = element_text(size = 14),
+        legend.position = c(0.98, 0.98),
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(2, 2, 2, 2),
+        axis.text.y = element_text(size =12, 
+                                   face = df.sign$bold,
+                                   color = df.sign$dirDA)) +
+  labs( fill = "Family"))
+
+
+# make a graph
+p.gg<-cowplot::plot_grid(g, s.g, ridge.ef,
+                         ncol = 3, 
+                         rel_widths = c(5,1,1), 
+                         align = "h", 
+                         labels = "AUTO",
+                         label_x = c(0,-0.07, -0.07))
+
+pgg<-plot_grid(
+  title, subtitle, p.gg,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.02, 0.02, 1))
+
+pgg
+cowplot::save_plot(pgg, 
+          filename = "/metaG/R_analyses/Taxonomy/Figures/GenODDs_prev.svg", 
+          base_width = 18, 
+          base_height = 26)
+```
+
+# Save a table
+```{r}
+df.sign.t<-df.sign
+# retrive motus for each genus
+df.sign.t$bold<-vector(length = nrow(df.sign.t))
+for(i in 1:nrow(df.sign.t)){
+  df.sign.t$bold[i]<-ifelse(df.sign.t$Genus[i] %in% df.16$bins, 
+                          df.16[df.16$bins == df.sign.t$Genus[i],"bins"], 
+                          "no 16S match match")
+  
+}
+
+
+
+all(df.sign.t$bins == df.sign.uniq$bin)
+
+supp.table<-data.frame(mOTUs = df.sign.t$bins,
+                       Family = df.sign.t$Family,
+                       Genera_16S = df.sign.t$bold,
+                       effect.size = df.sign.t$TE.random,
+                       SE = df.sign.t$seTE.random,
+                       CI.upper = df.sign.t$upper.random,
+                       CI.lower = df.sign.t$lower.random,
+                       direction.enrich = df.sign.t$dir,
+                       p.value.meta = df.sign.t$pval.random,
+                       q.value = df.sign.t$p.adjust,
+                       times.sign.PD = df.sign.uniq$tot.sign.taxa,
+                       times.sign.CTRL = df.sign.uniq$tot.sign.taxa.hc,
+                       average.ridge.weight = vector(length = nrow(df.sign.t)),
+                       stdev.ridge.weight = vector(length = nrow(df.sign.t)))
+
+for(i in 1:nrow(supp.table)){
+  # add average and stdev
+  supp.table$average.ridge.weight[i]<-df.pos.neg[df.pos.neg$taxa == supp.table$mOTUs[i],"average"][1,1] %>% unlist() *-1
+  supp.table$stdev.ridge.weight[i]<-df.pos.neg[df.pos.neg$taxa == supp.table$mOTUs[i],"stdev"][1,1] %>% unlist()
+}
+
+
+
+head(supp.table)
+dim(supp.table)
+write.table(x = supp.table, 
+            file = "/metaG//R_analyses/Taxonomy/RDS/DA.table.complete.txt",
+            col.names = T, 
+            row.names = F, 
+            quote = F,
+            sep = "\t")
+```
+
+
+# Plot a subset of genera for the main figures
+Format the dfs to be loaded while plotting 16S
+```{r}
+
+subset(df.sign,p.adjust<0.05 & abs(TE.random) > 0.257 )%>% dim
+subset(df.sign,p.adjust<0.05 & abs(TE.random) > 0.257 )-> df.sign 
+
+df.sign2<-df.sign
+df.sign2$Family_short<-gsub("incertae sedis", "i.s.", df.sign$Family_short %>% as.character())
+
+df.sign.uniq<-subset(df.cross.adj[!duplicated(df.cross.adj$bin),], bin %in% df.sign$bins)
+df.sign<-df.sign[order(df.sign$TE.random, decreasing = T),]
+df.sign.uniq<-df.sign.uniq %>% arrange(factor(bin, levels = df.sign$bins)) # this works!
+
+df.sign.uniq$TE<-vector(length = nrow(df.sign.uniq))
+for(i in 1:nrow(df.sign.uniq)){
+  df.sign.uniq$TE[i]<-df.sign[which(df.sign$bins == df.sign.uniq$bin[i]),]$TE.random
+}
+df.sign.uniq$bin<-factor(df.sign.uniq$bin, levels = unique(df.sign.uniq$bin))
+
+# save table for combining with 16S
+saveRDS(df.sign.uniq, "/metaG/R_analyses/Taxonomy/RDS/df.sign.uniq.es.rds")
+
+# add the ML coefficients
+df.pos.neg<-readRDS("/metaG//R_analyses/Taxonomy/RDS/Ridge_df.pos.neg.rds")
+df.pos.neg<-subset(df.pos.neg, taxa %in% df.sign$bins)
+
+# Format for plotting
+df.pos.neg$taxa<-factor(df.pos.neg$taxa, levels = df.sign$bins, ordered = T)
+
+
+# add dir of enrichment 
+df.pos.neg$dir<-vector(length = nrow(df.pos.neg))
+for(i in 1:nrow(df.pos.neg)){
+  df.pos.neg$dir[i]<-df.sign[df.sign$bins == df.pos.neg$taxa[i],]$dir
+}
+saveRDS(df.pos.neg, "/metaG/R_analyses/Taxonomy/RDS/df.pos.neg.es.rds")
+saveRDS(df.sign, "/metaG/R_analyses/Taxonomy/RDS/df.sign.formatted.es.rds")
+```
+
