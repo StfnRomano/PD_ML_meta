@@ -1,0 +1,271 @@
+---
+title: "Figs"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+```
+
+# Seq depth
+```{r}
+all<-readRDS("/16S/R_analyses/RDS/all_g_counts.rds") %>% t() %>% as.data.frame()
+meta<-readRDS("//16S/R_analyses/RDS/meta.rds")
+meta$Study_2<-as.character(meta$Study_2)
+meta$PD<-as.character(meta$PD)
+
+# rename metadata
+meta$Study_2[meta$Study_2 == "Aho"]<-"Aho_2019"
+meta$Study_2[meta$Study_2 == "Petrov"]<-"Petrov_2017"
+meta$Study_2[meta$Study_2 == "Keshavarzian"]<-"Keshavarzian_2015"
+meta$Study_2[meta$Study_2 == "Zhang"]<-"Zhang_2020"
+meta$Study_2[meta$Study_2 == "Nishiwaki"]<-"Nishiwaki_2020"
+meta$Study_2[meta$Study_2 == "Hopfner"]<-"Hopfner_2017"
+meta$Study_2[meta$Study_2 == "Weis"]<-"Weis_2019"
+meta$Study_2[meta$Study_2 == "Cirstea"]<-"Cirstea_2020"
+meta$Study_2[meta$Study_2 == "Tan"]<-"Tan_2021"
+meta$Study_2[meta$Study_2 == "Kenna"]<-"Kenna_2021"
+meta$Study_2[meta$Study_2 == "Wallen251"]<-"Wallen251_2021"
+meta$Study_2[meta$Study_2 == "Wallen151"]<-"Wallen151_2021"
+meta$Study_2[meta$Study_2 == "Jo"]<-"Jo_2022"
+meta$Study_2[meta$Study_2 == "Lubomski"]<-"Lubomski_2022"
+meta$Study_2[meta$Study_2 == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+meta$Study_2[meta$Study_2 == "Qian"]<-"Qian_2018"
+meta$Study_2[meta$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
+meta$PD[meta$PD == "HC"]<-"CTRL"
+
+
+
+all(rownames(all) == meta$SampleID)
+
+all$Study<-meta$Study_2 %>% as.factor()
+all$PD<-meta$PD %>% as.factor()
+
+all.sum<-data.frame(Study = all$Study,
+                    PD = all$PD,
+                    sum = rowSums(all[,-1*(which(names(all) == "PD" | names(all) == "Study"))]))
+
+ggplot(all.sum, aes(Study, log10(sum), fill = PD)) +
+  geom_boxplot() +
+  theme_bw() +    
+  scale_fill_manual(values = c('#ff6666',  '#525266' )) +
+  theme(axis.text.x = element_text(angle = 90, 
+                                   hjust=0.95,
+                                   vjust=0.2)) +
+  ylab("log10(#reads)")
+ggsave(filename = "/16S/R_analyses/Figures/Num_reads.svg", device = "svg", width = 8.5, height = 4)
+
+```
+#Load the data
+
+```{r}
+# clr
+s5<-readRDS("/16S/R_analyses/RDS//Single_5per_log.rds")
+s10<-readRDS("/16S/R_analyses/RDS/Single_10per_log.rds")
+s20<-readRDS("/16S/R_analyses/RDS/Single_20per_log.rds")
+s30<-readRDS("/16S/R_analyses/RDS/Single_30per_log.rds")
+
+#clr
+s5c<-readRDS("/16S/R_analyses/RDS/Single_5per_clr.rds")
+s10c<-readRDS("/16S/R_analyses/RDS/Single_10per_clr.rds")
+s20c<-readRDS("/16S/R_analyses/RDS/Single_20per_clr.rds")
+s30c<-readRDS("/16S/R_analyses/RDS/Single_30per_clr.rds")
+```
+
+```{r}
+# estimate the number of features left
+length(readRDS("//16S/R_analyses/RDS/spec_5x10.rds"))
+length(readRDS("/16S/R_analyses/RDS/spec_10x10.rds")) 
+length(readRDS("/16S/R_analyses/RDS/spec_20x10.rds"))
+length(readRDS("/16S/R_analyses/RDS/spec_30x10.rds")) 
+
+
+# rename
+
+s5$prev<-rep("5% in 10 studies (214 feat.)", length = nrow(s5))
+s10$prev<-rep("10% in 10 studies (155 feat.)", length = nrow(s10))
+s20$prev<-rep("20% in 10 studies (110 feat.)", length = nrow(s20))
+s30$prev<-rep("30% in 10 studies (86 feat.)", length = nrow(s30))
+
+s5c$prev<-rep("5% in 10 studies (214 feat.)", length = nrow(s5c))
+s10c$prev<-rep("10% in 10 studies (155 feat.)", length = nrow(s10c))
+s20c$prev<-rep("20% in 10 studies (110 feat.)", length = nrow(s20c))
+s30c$prev<-rep("30% in 10 studies (86 feat.)", length = nrow(s30c))
+
+
+df<-rbind.data.frame(s5, s10, s20, s30, s5c, s10c, s20c, s30c)
+df$prev<-factor(df$prev,
+                levels = c("5% in 10 studies (214 feat.)", 
+                           "10% in 10 studies (155 feat.)", 
+                           "20% in 10 studies (110 feat.)", 
+                           "30% in 10 studies (86 feat.)"))
+
+
+(g<-ggplot(df, aes(prev, AUC, fill=norm)) +
+  geom_boxplot() +
+  facet_wrap(~ML, nrow = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, 
+                                   hjust=0.95,
+                                   vjust=0.2)) +
+  scale_fill_manual(values = c("#A669EE", "#CC79A7")) +
+  xlab("Prevalence filtration")+
+  labs(fill = "Normalization"))
+
+ggsave(filename = "/16S/R_analyses/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
+
+```
+
+#CSV
+```{r}
+
+perf_sing_log<-readRDS("/16S/R_analyses/RDS/Single_5per_log.rds")
+#take only 5%
+perf_sing_log<-subset(perf_sing_log, prev == "5% in 10 std")
+perf_sing_log$batch<-rep("Not corrected", nrow(perf_sing_log))
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+
+
+
+csv<-readRDS("/16S/R_analyses/RDS/CSV_5perc_Log_df_auc.rds")
+
+df_comb<-rbind.data.frame(perf_log, csv)
+df_comb.p<-df_comb
+saveRDS(df_comb.p, "/16S/R_analyses/RDS/df.com.rds") 
+
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
+df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
+df.diag<-df_comb[1:102,]
+(r<-ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  geom_text(data = df.auc, mapping = aes(label = AUC), color = "white", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12)) +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2))
+
+ggsave(plot = r, filename = "/16S/R_analyses//Figures/CSV_5perc_log.jpeg", device = "jpeg", width = 21, height = 12)
+
+```
+
+# Compare rarefied and not rarefied
+
+```{r}
+rar2<-readRDS("/16S/R_analyses/RDS/CSV_5perc_Log_df_auc_rar2.rds")
+csv<-readRDS("/16S/R_analyses/RDS/CSV_5perc_Log_df_auc.rds")
+
+rar2$rar<-"Rarefied at 2000"
+csv$rar<-"Not rarefied"
+all(rar2$training.data  == csv$training.data )
+all(rar2$ML == csv$ML)
+
+df.rar2<-data.frame(not_rar=csv$AUC,
+                    rar=rar2$AUC,
+                    ML = csv$ML,
+                    study = csv$training.data )
+df.rar2$not_rar<-as.numeric(df.rar2$not_rar)
+df.rar2$rar<-as.numeric(df.rar2$rar)
+
+# format for t-test test
+l_df.rar<-split(df.rar2, f = as.factor(df.rar2$ML))
+l_df.rar.w<-lapply(l_df.rar, function(x) t.test(Pair(not_rar, rar) ~ 1, data = x, var.equal = F))
+l_df.rar.w
+
+# check averages
+lapply(l_df.rar, function(x) x %>%
+         summarise(average_NOTrar = mean(not_rar),
+                   stdev_NOTrar = sd(not_rar),
+                   average_rar = mean(rar),
+                   stdev_rar = sd(rar)))
+
+
+g<-ggplot(df.rar2, aes(not_rar, rar)) +
+  geom_point(size = 4, pch = 21,  stroke = 1, alpha = 0.6) +
+  geom_abline(intercept = 0, slope = 1) +
+  facet_wrap(~ML) +
+  theme_bw() +
+  xlab("Not rarefied") +
+  ylab("Rarefied")
+g
+ggsave(filename = "/16S/R_analyses/Figures/Rarefied_vs_notRarefied.svg", width = 8, height = 4)
+
+
+df.rar<-rbind.data.frame(rar2, csv)                       
+df.rar$AUC<-as.numeric(df.rar$AUC)
+g<-ggplot(df.rar, aes(rar, AUC)) +
+  geom_boxplot() +
+  facet_wrap(~ML) +
+  xlab("") +
+  ylab("AUC") +
+  theme_bw()
+g
+ggsave(filename = "/16S/R_analyses//Figures/BoxPlor_Rarefied_vs_notRarefied.svg", width = 8, height = 4)
+
+```
+
+# Comopare batch corections
+```{r}
+
+per.mean<-readRDS("/16S/R_analyses/RDS/Single_5per_log_Mean.rds")
+per.mean$batch<-rep("Mean", nrow(per.mean))
+
+per.mmmup<-readRDS("/16S/R_analyses/RDS/Single_5per_log_MMuphin.rds")
+per.mmmup$batch<-rep("MMuphin", nrow(per.mmmup))
+
+per.rA<-readRDS("/16S/R_analyses/RDS/Single_5per_log_ratioA.rds")
+per.rA$batch<-rep("ratioA", nrow(per.rA))
+
+per.rG<-readRDS("/16S/R_analyses/RDS/Single_5per_log_ratioG.rds")
+per.rG$batch<-rep("ratioG", nrow(per.rG))
+per<-s5
+per$batch<- rep("Not corrected", nrow(per))
+
+perf<-rbind.data.frame(per, 
+                       per.mean,
+                       per.mmmup,
+                       per.rA,
+                       per.rG)
+perf$batch<-as.factor(perf$batch)
+perf$batch<-relevel(perf$batch, ref = "Not corrected")
+
+g<-ggplot(perf, aes(batch, AUC)) +
+  geom_boxplot() +
+  facet_wrap(~ML) +
+  xlab("Batch correction") +
+  ylab("AUC") +
+  theme_bw() +
+  theme(axis.text.x=element_text(size=8, angle=90,hjust=0.95,vjust=0.2))
+g
+
+
+ggsave(filename = "/16S/R_analyses/Figures/Batch_correction.svg", width = 8, height = 4)
+
+# test sign of differences
+
+perf %>%
+  group_by(ML) %>%
+  summarise(anova.pvalue = anova(aov(as.numeric(AUC)~batch))$`Pr(>F)`[1])
+  
+```
+
+

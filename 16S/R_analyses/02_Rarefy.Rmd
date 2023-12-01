@@ -1,0 +1,69 @@
+---
+title: "rarefy"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr", "rtk")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+list.of.bioc <- c("phyloseq")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+library(phyloseq)
+library(dplyr)
+library(rtk)
+
+d<-"//16S/R_analyses/RData/"
+dir.create(d, recursive = T)
+
+```
+
+Load metadata + datasets
+```{r}
+meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
+all.g<-readRDS("/16S/R_analyses/RDS/all_g_counts.rds")
+```
+Chek it the meta SapleID match with the one in the genus table
+```{r}
+dim(meta)
+dim(all.g)
+
+# are all samples in meta in the OTU table?
+stopifnot(all(meta$SampleID %in% names(all.g)))
+all(meta$SampleID %in% names(all.g))
+```
+
+# Rarefy at 2000
+```{r}
+
+rar<-rtk(all.g, repeats = 1, depth = 2000, ReturnMatrix = 1, margin = 2,
+    verbose = FALSE, threads = 4, tmpdir = NULL, seed = 56987)
+
+all.g.2.rar<-rar$raremat %>% as.data.frame()
+
+
+print("Save a count table and a proportion table")
+all.g.2.rar<-as.data.frame(prop.table(as.matrix(all.g.2.rar), 2))
+
+all.g.2.rar<-all.g.2.rar[, order(names(all.g.2.rar))]
+all.g.2.count<-all.g.2.rar
+
+all(meta$SampleID == names(all.g.2.rar))
+
+
+if(all(meta$SampleID == names(all.g.2.rar)) & all(meta$SampleID == names(all.g.2.count))){
+  saveRDS(all.g.2.count, "/16S/R_analyses/RDS/all_g_counts_rar2.rds")
+  saveRDS(all.g.2.rar, "/16S/R_analyses/RDS/all_g_TSS_rar2.rds")
+} else {print("Something is wrong check!")}
+
+```

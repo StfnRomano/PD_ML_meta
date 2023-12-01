@@ -1,0 +1,54 @@
+---
+title: "Fig 2"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# metaG
+```{r}
+library(dplyr)
+```
+
+#Load the data
+```{r}
+
+perf_sing_log<-readRDS("//16S/R_analyses/RDS/Single_5per_log.rds")
+#take only 5%
+perf_sing_log<-subset(perf_sing_log, prev == "5% in 10 std")
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm,
+  self = rep("within-study", length = nrow(perf_sing_log)),
+  method = rep("CV", length = nrow(perf_sing_log)))
+  
+ridge<-subset(perf_log, ML == "ridge")
+
+csv_log<-readRDS("/16S/R_analyses/RDS/CSV_5perc_Log_df_auc.rds")
+csv.ridge<-subset(csv_log, ML == "ridge")
+csv_log$self<-rep("study-to-study", nrow(csv_log))
+csv_log$method<-rep("CSV", nrow(csv_log))
+
+df_comb<-rbind.data.frame(ridge, csv_log)
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-df_comb$AUC*100
+
+saveRDS(df_comb, "/16S/R_analyses/RDS/df.comb.cv.scv.rds")
+
+```
+LOSO
+```{r}
+# load loso
+loso<-readRDS("/16S//R_analyses/RDS/16S_loso.ridge.rds")
+ls.out<-loso@auc
+ls.out$training<-rep("All studies", nrow(ls.out))
+ls.out$AUC<-ls.out$AUC* 100
+ls.out$method<-rep("LOSO", nrow(ls.out))
+
+saveRDS(ls.out, "/16S/R_analyses/RDS/ls.out.cv.scv.rds")
+```

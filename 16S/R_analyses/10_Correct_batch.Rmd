@@ -1,0 +1,79 @@
+---
+title: "batch correct"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.bioc <- c("phyloseq", "grDevices", "microbiome")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+
+list.of.packages <- c("dplyr", "ggplot2",  "bapred", "MMUPHin")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+ if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+library(phyloseq)
+library(dplyr)
+library(microbiome)
+library(bapred)
+library(MMUPHin)
+
+```
+
+Load data and metadata
+```{r}
+all.tss<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
+meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
+```
+
+## MMUPHin
+https://bioconductor.org/packages/release/bioc/vignettes/MMUPHin/inst/doc/MMUPHin.html#4_Performing_batch_(Study_2)_effect_adjustment_with_adjust_batch
+```{r}
+mmuphin_adjusted<-adjust_batch(feature_abd = all.tss,
+                               batch = "Study_2",
+                               data = meta)
+saveRDS(mmuphin_adjusted$feature_abd_adj %>% as.data.frame(), "/16S/R_analyses/RDS/MMuphin_ad.rds")
+```
+
+## ba - meancenter_adjust
+```{r}
+all.t<-t(all.tss)
+meta$Study_2_bin<-as.factor(as.numeric(meta$Study_2))
+all.t.adj<-ba(all.t, batch = meta$Study_2_bin, method = "meancenter")
+
+meancenter_adjust<-as.data.frame(all.t.adj$xadj)
+meancenter_adjust<-meancenter_adjust + -min(as.vector(meancenter_adjust %>% as.matrix()))
+saveRDS(t(meancenter_adjust)%>% as.data.frame(), "/16S/R_analyses/RDS/Mean_ad.rds")
+
+```
+
+# ba - Ratio-A
+```{r}
+all.t<-t(all.tss)
+meta$Study_2_bin<-as.factor(as.numeric(meta$Study_2))
+all.t.adj<-ba(all.t, batch = meta$Study_2_bin, method = "ratioa")
+
+ratioa_adjust<-as.data.frame(all.t.adj$xadj)
+saveRDS(t(ratioa_adjust) %>% as.data.frame(), "/16S/R_analyses/RDS/RatioA_ad.rds")
+
+```
+
+# ba - Ratio-G
+```{r}
+all.t<-t(all.tss)
+meta$Study_2_bin<-as.factor(as.numeric(meta$Study_2))
+all.t[all.t == 0]<-1e-20
+all.t.adj<-ba(all.t, batch = meta$Study_2_bin, method = "ratiog")
+
+ratiog_adjust<-as.data.frame(all.t.adj$xadj)
+saveRDS(t(ratiog_adjust) %>% as.data.frame(), "/16S/R_analyses/RDS/RatioG_ad.rds")
+
+```

@@ -1,0 +1,313 @@
+---
+title: "Beta"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr", "vegan", "ggplot2", "RColorBrewer", "ggExtra", "gridExtra", "ggpubr", "cowplot")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+list.of.bioc <- c("phyloseq",  "grDevices", "microbiome", "ggpubr")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+library(phyloseq)
+library(dplyr)
+library(microbiome)
+library(vegan)
+library(RColorBrewer)
+library(cowplot)
+library(gridExtra)
+library(ggExtra)
+library(ggpubr)
+
+d<-"/16S/R_analyses/RData/"
+dir.create(d, recursive = T)
+set.seed(456)
+```
+
+Load metadata + datasets
+```{r}
+meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
+all.g<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
+
+# Double check samples match
+dim(meta)
+dim(all.g)
+stopifnot(all(meta$SampleID %in% names(all.g)))
+all(meta$SampleID %in% names(all.g))
+```
+
+# Beta
+Use BC dissimilarities
+```{r, fig.width = 10, fig.height = 10}
+all_phylo<-phyloseq(otu_table(all.g,taxa_are_rows = T), sample_data(meta))
+all_bc<-phyloseq::distance(all_phylo, method = "bray")
+
+# Permanova
+
+# Desease
+perm<-how(blocks = as.factor(meta$Study_2), nperm = 999)
+(a.pd.bc<-adonis2(all_bc ~ PD, data = microbiome::meta(all_phylo), permutations = perm))
+
+# Study
+(a.st.bc<-adonis2(all_bc ~ Study_2, data = microbiome::meta(all_phylo)))
+
+```
+
+# Make plot
+## 16S plot
+```{r}
+nb.cols <- 18
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+
+
+all_dbrda_bc<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo  ~ 1 + Condition(Study))
+plot_ordination(all_phylo, all_dbrda_bc, "samples", shape="PD", color = "Study_2") +
+                theme_bw() +
+                scale_fill_manual(values = mycolors) +
+                geom_point(size = 2.5) +
+                labs(color = "Study_2", shape = "Status") +
+                theme(legend.title = element_text(size = 12, face = "bold"),
+                      legend.text = element_text(size = 12)) +
+    ggtitle("dbRDA-Conditioned Study - BC")
+```
+
+## Combine 16S and metaG
+### First conditioned by study
+```{r}
+# change HC in CTRL
+meta$PD<-as.character(meta$PD)
+meta$PD[meta$PD == "HC"]<-"CTRL"
+
+# Make a graph with side distributions
+sc<-scores(all_dbrda_bc, display = "sites") %>% as.data.frame() # extract the coordinates
+meta<-meta[order(meta$SampleID),]
+all(rownames(sc) == meta$SampleID)
+
+sc.m<-cbind.data.frame(sc, meta)
+sc.m$PD<-as.factor(sc.m$PD)
+all_dbrda_bc
+
+
+(o<-ggplot(sc.m, aes(MDS2, MDS1, colour = PD, shape = PD)) +
+    geom_point(size = 3, alpha = 0.5) +
+    theme_minimal() +
+    scale_colour_manual(values = c("#525266", "#ff6666")) +
+    xlab("MDS1 [8.7%]") +
+    ylab("MDS2 [4.9%]") +
+     theme(plot.caption  = element_text(size = 10),
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size =14),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(color = "black",
+                                    fill = NA,
+                                    size = 1),
+        legend.position = c(0.1, 0.15))+
+     annotate("text",  x=-1.9, y=2.2, label= "16S", fontface = "bold") +
+    guides(colour = "none") +
+    labs(shape = "Condition"))
+
+# Make a df for the permanova
+df.perm.16s<-data.frame(p_value=c(0.001, 0.001),
+                        df = c(16, 1),
+                        F_stat = c(49.03, 31.39),
+                        R2=c(20.0, 1.0))
+gtable.16S<-ggtexttable(df.perm.16s, rows = c("Study", "Disease status"), theme = ttheme("light"))
+
+
+(og<-ggMarginal(o, 
+                groupFill = TRUE, 
+                groupColour = T,
+                size = 5,
+                type = "boxplot"))
+
+
+og<-plot_grid(og,gtable.16S,ncol=1, rel_heights = c(2,0.8))
+
+metag<-readRDS("/metaG/R_analyses/Taxonomy/RDS/dbRDA_df.rds")
+metag$PD[metag$PD == "HC"]<-"CTRL"
+
+(om<-ggplot(metag, aes(MDS1, MDS2, colour = PD, shape = PD)) +
+    geom_point(size = 4, alpha = 0.5) +
+    theme_minimal() +
+    scale_colour_manual(values = c("#525266", "#ff6666")) +
+    xlab("MDS1 [6%]") +
+    ylab("MDS2 [3.7%]") +
+    theme(plot.caption  = element_text(size = 10),
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size =14),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(color = "black",
+                                    fill = NA,
+                                    size = 1),
+        legend.position = c(0.1, 0.15))+
+        annotate("text", x=-1.9, y=2.2, label= "SMG", fontface = "bold") +
+    labs(colour = "Condition", shape = "Condition") +
+    guides(shape = "none"))
+
+(omg<-ggMarginal(om, 
+                 groupFill = TRUE, 
+                 groupColour = T,
+                 size = 5,
+                type = "boxplot"))
+
+# make df for the metaG permanova
+df.perm<-data.frame(p_value=c(0.001, 0.001),
+                        df = c(6, 1),
+                        F_stat = c(18.23, 7.94),
+                        R2=c(7.7,0.6))
+gtable<-ggtexttable(df.perm, rows = c("Study","Disease status"), theme = ttheme("light"))
+omg<-plot_grid(omg,gtable,ncol=1, rel_heights = c(2,0.8))
+
+
+
+(pcos.plots<-cowplot::plot_grid(og, omg, ncol = 2, align = "hv",
+          axis = "bl",rel_widths =c(1,1), labels = c( "A", "B"),
+          label_y = 0.97, label_x = c(-0.002,-0.03)))
+
+
+# make titles
+title <- ggdraw() + 
+  draw_label(
+    "dbRDA based on Bray-Curtis dissimilarities",
+    fontface = 'bold', size =14,
+    x = 0.02,
+    y = 0.3,
+    hjust = 0
+  ) +
+  theme(
+    plot.margin = margin(0, 0, 0, 0)
+  )
+
+
+
+(pcos.plots.title<-cowplot::plot_grid(title, 
+                                      pcos.plots, 
+                                      align = "hv", 
+                                      nrow = 3, 
+                                      rel_heights = c(0.07, 0.07, 1 ,1),
+                                      rel_widths = c(10,10)))
+
+```
+
+### Then not conditioned by study
+```{r}
+nb.cols <- 18
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+
+
+all_dbrda_bcs<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo  ~ 1)
+
+# Quick plot
+plot_ordination(all_phylo, all_dbrda_bcs, "samples", shape="PD", color = "Study_2") +
+                theme_bw() +
+                scale_fill_manual(values = mycolors) +
+                geom_point(size = 2.5) +
+                labs(color = "Study_2", shape = "Status") +
+                theme(legend.title = element_text(size = 12, face = "bold"),
+                      legend.text = element_text(size = 12)) +
+    ggtitle("dbRDA NOT-Conditioned Study - BC")
+
+
+sc<-scores(all_dbrda_bcs, display = "sites") %>% as.data.frame() # extract the coordinates
+meta<-meta[order(meta$SampleID),]
+all(rownames(sc) == meta$SampleID)
+
+sc.m<-cbind.data.frame(sc, meta)
+sc.m$PD<-as.factor(sc.m$PD)
+all_dbrda_bc
+
+(os<-ggplot(sc.m, aes(MDS2, MDS1, colour = Study_2, shape = PD)) +
+    geom_point(size = 3, alpha = 0.5) +
+    theme_minimal() +
+    scale_colour_manual(values = mycolors) +
+    xlab("MDS1 [9.4%]") +
+    ylab("MDS2 [7.3%]") +
+     theme(legend.position = "none",
+        plot.caption  = element_text(size = 10),
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size =14),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(color = "black",
+                                    fill = NA,
+                                    size = 1))+
+    annotate("text",  x=-2.2, y=1.5, label= "16S", fontface = "bold") +
+    labs(shape = "Condition") +
+    guides(colour = "none"))
+
+(os<-ggMarginal(os, 
+                  groupFill = TRUE, 
+                  groupColour = TRUE,
+                  size = 5,
+                  type = "boxplot"))
+
+metag<-readRDS("/metaG/R_analyses/Taxonomy/RDS/dbRDA_df_study.rds")
+metag$Study_2<-gsub("_20.*", "", metag$Study)
+metag$PD[metag$PD == "HC"]<-"CTRL"
+
+(oms<-ggplot(metag, aes(MDS1, MDS2, colour = Study_2, shape = PD)) +
+    geom_point(size = 3, alpha = 0.5) +
+    theme_minimal() +
+    scale_colour_manual(values = mycolors) +
+    xlab("MDS1 [7.2%]") +
+    ylab("MDS2 [4.3%]") +
+    theme(legend.position =  "none",
+          plot.caption  = element_text(size = 10),
+        plot.title = element_text(size = 16, face = "bold"),
+        plot.subtitle = element_text(size =14),
+        panel.grid = element_blank(),
+        axis.text = element_blank(),
+        panel.border = element_rect(color = "black",
+                                    fill = NA,
+                                    size = 1)) +
+        annotate("text", x=-1.5, y=1.5, label= "SMG", fontface = "bold") +
+    labs(colour = "Study"))
+
+(omgs<-ggMarginal(oms, 
+                  groupFill = TRUE, 
+                  groupColour = TRUE,
+                  size = 5,
+                  type = "boxplot"))
+
+
+
+(pcos.plots<-cowplot::plot_grid(os, omgs, og, omg, 
+                                ncol = 2, 
+                                align = "h",
+                                axis = "bl",
+                                rel_widths =c(1,1), 
+                                rel_heights = c(1,1.4),
+                                labels = c( "a", "b", "c", "d"),
+                                label_y = 0.97, label_x = c(-0.002,-0.03)))
+
+
+(pcos.plots.title<-cowplot::plot_grid(title, pcos.plots, 
+                                      align = "v", 
+                                      nrow = 2, 
+                                      rel_heights = c(0.1, 2 ,2),
+                                      rel_widths = c(10,10)))
+
+cowplot::save_plot("/16S/R_analyses/Figures/dbRDA_BC_Only_plots_metaG_Study_boxplot.svg", pcos.plots.title, 
+                   base_width = 9, base_height = 10)
+
+```
+
+    
+# Save workspace
+```{r}
+d<-"/16S/R_analyses/RData/"
+save.image(paste0(d, "16S_beta.RData"))
+```
+
