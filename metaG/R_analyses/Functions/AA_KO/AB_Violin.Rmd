@@ -1,0 +1,226 @@
+---
+title: "Violin_AUCs"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, root.dir}
+library(ggplot2)
+library(dplyr)
+```
+
+# Load data and metadata
+
+```{r}
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+```
+
+```{r}
+# GMM
+gmm<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GMM_single_5per_log.rds")
+gmm$funct<-rep("GMM", nrow(gmm))
+
+gmm.l<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GMM_loso_ridge.rds")
+gmm.l<-gmm.l@auc
+gmm.l$funct<-rep("GMM", nrow(gmm.l))
+gmm.csv<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/CSV_GMM_Log_df_auc.rds")
+gmm.csv<-subset(gmm.csv, ML == "ridge")
+gmm.csv$funct<-rep("GMM", nrow(gmm.csv))
+
+
+KO<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/Single_5per_log.rds")
+KO$funct<-rep("KO", nrow(KO))
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RData")
+df<-data.frame(
+  study = rep("Wallen_2022", 6),
+  prev = rep("5% in 2 std ", 6),
+  ML = c("lasso", "lasso_ll", "enet", "ridge", "ridge_ll", "random_forest"),
+  AUC = c(lasso_5x10@auc$Wallen_2022, 
+          lassoll_5x10@auc$Wallen_2022, 
+          enet_5x10@auc$Wallen_2022, 
+          ridge_5x10@auc$Wallen_2022, 
+          ridge_ll_5x10@auc$Wallen_2022, 
+          rf_5x10@auc$Wallen_2022),
+  norm = rep("log", 6),
+  funct = rep("KO", 6)
+)
+KO<-rbind.data.frame(KO, df)
+
+KO.l<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/All_metaG_loso_ridge.rds")
+KO.l<-KO.l@auc
+KO.l$funct<-rep("KO", nrow(KO.l))
+KO.csv<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+csv_wallen.out<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/Wallen_CSV.rds")
+csv_wallen.out$norm<-rep("LOG", nrow(csv_wallen.out))
+KO.csv<-rbind.data.frame(KO.csv, csv_wallen.out)
+KO.csv<-subset(KO.csv, ML == "ridge")
+KO.csv$funct<-rep("KO", nrow(KO.csv))
+
+KOpath<-readRDS("/metaG/R_analyses/Functions/AA_KOpath//RDS/Single_5per_log.rds")
+KOpath$funct<-rep("KEGGpath", nrow(KOpath))
+KOpath.l<-readRDS("/metaG/R_analyses/Functions/AA_KOpath//RDS/All_metaG_loso_ridge.rds")
+KOpath.l<-KOpath.l@auc
+KOpath.l$funct<-rep("KEGGpath", nrow(KOpath.l))
+KOpath.csv<-readRDS("/metaG/R_analyses/Functions/AA_KOpath/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+KOpath.csv<-subset(KOpath.csv, ML == "ridge")
+KOpath.csv$funct<-rep("KEGGpath", nrow(KOpath.csv))
+
+
+gbm<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_single_5per_log.rds")
+gbm$funct<-rep("GBM", nrow(gbm))
+gbm.l<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_loso_ridge.rds")
+gbm.l<-gbm.l@auc
+gbm.l$funct<-rep("GBM", nrow(gbm.l))
+gbm.csv<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_CSV_Log_df_auc.rds")
+gbm.csv<-subset(gbm.csv, ML == "ridge")
+gbm.csv$funct<-rep("GBM", nrow(gbm.csv))
+
+KOm<-readRDS("/metaG/R_analyses/Functions/AB_KOmod/RDS/Single_5per_log.rds")
+KOm$funct<-rep("KEGGmod", nrow(KOm))
+KOm.l<-readRDS("/metaG/R_analyses/Functions/AB_KOmod//RDS/All_metaG_loso_ridge.rds")
+KOm.l<-KOm.l@auc
+KOm.l$funct<-rep("KEGGmod", nrow(KOm.l))
+KOm.csv<-readRDS("/metaG/R_analyses/Functions/AB_KOmod/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+KOm.csv<-subset(KOm.csv, ML == "ridge")
+KOm.csv$funct<-rep("KEGGmod", nrow(KOm.csv))
+
+
+tax<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+tax$funct<-rep("taxonomy", nrow(tax))
+tax.l<-readRDS("/metaG/R_analyses/Taxonomy/RDS/All_metaG_loso_ridge.rds")
+tax.l<-tax.l@auc
+tax.l$funct<-rep("taxonomy", nrow(tax.l))
+tax.csv<-readRDS("/metaG/R_analyses/Taxonomy/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+tax.csv<-subset(tax.csv, ML == "ridge")
+tax.csv$funct<-rep("taxonomy", nrow(tax.csv))
+
+# combine cv
+df.all<-rbind.data.frame(gmm, KO, KOm, KOpath, gbm, tax)
+df.all$funct<-factor(df.all$funct, levels = c("taxonomy","KO", "KEGGmod", "KEGGpath", "GMM", "GBM"), ordered = T)
+df.all$type<-rep("within-study CV", nrow(df.all))
+
+# combine loso
+l.all<-rbind.data.frame(gmm.l, KO.l, KOm.l, KOpath.l, gbm.l, tax.l)
+l.all$type<-rep("LOSO", nrow(l.all))
+l.all$AUC<-round(l.all$AUC, 2)*100
+
+# combine csv
+csv.all<-rbind.data.frame(KO.csv, KOm.csv, KOpath.csv, tax.csv, gmm.csv, gbm.csv)
+csv.all$type<-rep("CSV", nrow(csv.all))
+csv.all$AUC<-as.numeric(csv.all$AUC)
+csv.all$AUC<-round(csv.all$AUC, 2)*100
+
+ridge.all.tax.f<-subset(df.all, ML  == "ridge")
+
+ridge.all.tax.f$AUC<-round(ridge.all.tax.f$AUC, 2)*100
+names(ridge.all.tax.f)<-c("study", "prev", "ML", "AUC", "norm", "profile", "type")
+
+(r<-ggplot(ridge.all.tax.f, aes(x =  profile,y = study,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90,hjust=0.95,vjust=0.2),
+        panel.background = element_blank(),
+        panel.grid = element_blank(),
+        panel.border = element_blank(),
+        axis.text = element_text(size = 12)))
+ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/AUC_across_functions_tiles.svg", 
+       width = 8, 
+       height = 6)
+
+```
+# Prepare dataframe needed
+
+```{r}
+df.average<-ridge.all.tax.f %>%
+  group_by(profile) %>%
+  summarise(mean = mean(AUC))
+
+l.average<-l.all %>%
+  group_by(funct) %>%
+  summarise(mean = mean(AUC))
+
+
+# make df for points
+df.points<-data.frame(
+  study = c(ridge.all.tax.f$study, l.all$study.out),
+  AUC = c(ridge.all.tax.f$AUC, l.all$AUC),
+  method = c(ridge.all.tax.f$funct, l.all$funct),
+  type = c(ridge.all.tax.f$type, l.all$type) %>% as.factor())
+```
+# Make violin plot
+```{r}
+# create final df
+csv.all$funct<-factor(csv.all$funct, levels = c("taxonomy", "KO", "KEGGmod", "KEGGpath", "GBM", "GMM"))
+df.points$method<-factor(df.points$method, levels = c("taxonomy", "KO", "KEGGmod", "KEGGpath", "GBM", "GMM"))
+df.all$type<-factor(df.all$type, levels = c("within-study CV", "CSV", "LOSO"), ordered = T)
+
+df.all<-data.frame(AUC = c(csv.all$AUC, df.points$AUC),
+                   funct = c(csv.all$funct, df.points$method),
+                   type = c(csv.all$type , df.points$type %>%
+                              as.character()))
+
+ggplot() + 
+      geom_hline(yintercept=50, linetype = "dashed", 
+                color = "darkgray", size=1) +
+
+    theme_bw() +
+    # add violins
+    geom_violin(data = df.all,
+                mapping = aes(x = funct, 
+                              y = AUC, 
+                              fill = type),
+                trim = T,
+                size = 0.7,
+                alpha = 0.5,
+                position = "dodge", 
+                scale = "width") +
+  scale_fill_manual(values = c("#0072B2", "#FFED00", "white")) +
+    # add stats summaries
+    stat_summary(data = df.all,
+                mapping = aes(x = funct,
+                              y = AUC,
+                              group = type,
+                              color = type),
+                fun.data = "mean_sdl",
+                color = "black",
+                fun.args = list(mult = 1),
+                geom = "pointrange",
+                size = 1.3,
+                position = position_dodge2(width = 0.9)) +
+ 
+    stat_summary(data = df.all,
+                mapping = aes(x = funct,
+                              y = AUC,
+                              group = type,
+                              color = type),
+                fun.data = "mean_sdl",
+                fun.args = list(mult = 1),
+                geom = "pointrange",
+                size = 1,
+                color = "lightgray",
+                position = position_dodge2(width = 0.9)) +
+  labs(
+        x = "Profiles",
+        fill = "ML approaches") +
+  theme(axis.text.x = element_text(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        title = element_text(size = 14)) 
+
+
+
+
+ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/Functions_Only_Violin_merged.svg", 
+       width = 8, 
+       height = 5) 
+
+
+
+
+```

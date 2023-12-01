@@ -1,0 +1,154 @@
+---
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# ---
+title: "16S_ML"
+author: "SRomano"
+date: "15/11/2021"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+library(phyloseq)
+library(dplyr)
+library(mlr3)
+library(SIAMCAT)
+# load my function to run siamcat
+source("/Scripts/Siamcat_wf.r")
+source("/Scripts/Cross_study_validation.r")
+set.seed(56987)
+```
+
+# Load the Log transformed models
+```{r}
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RData")
+```
+## Load data
+```{r}
+all.tss<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+all.tss.store<-all.tss # add that just to avoid changing all the names from the old script
+meta<-readRDS("/metaG/R_analyses/Taxonomy//RDS/meta.rds")
+```
+
+# Make a function
+```{r}
+cross.study.validation.wallen<-function(list.models,
+                                 microbiome,
+                                 meta,
+                                 names.studies,
+                                 label="PD", 
+                                 case="PD",
+                                 auc.plot = F,
+                                 name.study.var = "Study",
+                                 study.in.models = T,
+                                 meta.test.hold = NULL,
+                                 microbiome.test.hold = NULL,
+                                 name.study.var.hold = NULL,
+                                 label.hold = NULL,
+                                 case.hold = NULL,
+                                 direction = "auto"){
+      std<-names(list.models@siamcat)
+      # get the list of test sets
+      print(paste("The model to test is", std))
+      # select the list of models to test
+      l_train<-list.models@siamcat$Wallen_2022
+      l_all_tests<-vector(mode = "list", length = length(names.studies))
+      # run cross study validation
+      out<-data.frame( training.data = vector(length = st),
+                       testing.data =vector(length = st),
+                       AUC =vector(length = st))
+        for(tst in 1:length(names.studies)){
+          print(paste("Testing the model on", names.studies[tst]))
+          test.study<-names.studies[tst]
+        # select data that need to be tested
+          meta.test<-meta[meta[, name.study.var] == test.study,]
+          microbiome.test<-microbiome[, meta.test$SampleID]
+        # create a SIAMCAT obj with that
+          sc.obj.test <- siamcat(feat=microbiome.test, meta=meta.test,label=label, case=case)
+        # make prediction with each model in the list of training data
+          l_prediction <- make.predictions(l_train, siamcat.holdout = sc.obj.test)
+          l_prediction <- evaluate.predictions(l_prediction)
+
+        # prepare a dataframe
+          out[tst,]<-c(std, names.studies[tst], l_prediction@eval_data$auroc)
+  
+
+        }
+      return(out)
+}
+
+
+
+```
+
+
+# Cross study validation
+
+```{r}
+study<-as.character(meta$Study) %>% unique()
+rownames(meta)<-meta$SampleID
+all.tss<-all.tss.store[spec,]
+
+print("CSV with lasso")
+l_csv_l5<-cross.study.validation.wallen(list.models = lasso_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_l5$ML<-rep("lasso", length = nrow(l_csv_l5))
+
+
+print("CSV with enet")
+l_csv_e5<-cross.study.validation.wallen(enet_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_e5$ML<-rep("enet", length = nrow(l_csv_e5))
+
+print("CSV with ridge")
+l_csv_r5<-cross.study.validation.wallen(ridge_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_r5$ML<-rep("ridge", length = nrow(l_csv_r5))
+
+print("CSV with ridge_ll")
+l_csv_rl5<-cross.study.validation.wallen(ridge_ll_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_rl5$ML<-rep("ridge_ll", length = nrow(l_csv_rl5))
+
+
+print("CSV with lasso_ll")
+l_csv_ll5<-cross.study.validation.wallen(lassoll_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_ll5$ML<-rep("lasso_ll", length = nrow(l_csv_ll5))
+
+
+print("CSV with random forest")
+l_csv_rf5<-cross.study.validation.wallen(rf_5x10,
+                       microbiome = all.tss,
+                       meta=meta,
+                       names.studies = study,
+                       name.study.var = "Study")
+l_csv_rf5$ML<-rep("random_forest", length = nrow(l_csv_rf5))
+
+# Combine the df
+
+csv_wallen.out<-rbind.data.frame(l_csv_l5, l_csv_e5, l_csv_r5, l_csv_rl5, l_csv_ll5, l_csv_rf5)
+
+saveRDS(csv_wallen.out, "/metaG/R_analyses/Functions/AA_KO/RDS/Wallen_CSV.rds")
+```

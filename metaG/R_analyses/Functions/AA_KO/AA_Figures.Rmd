@@ -1,0 +1,228 @@
+---
+title: "Figs KO"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, root.dir}
+library(ggplot2)
+library(dplyr)
+```
+
+#KO
+
+```{r}
+#cv
+perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AA_KO//RDS/Single_5per_log.rds")
+perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
+
+# format to merge with the other + ad wallen
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RData")
+df<-data.frame(
+  training.data = rep("Wallen_2022", 6),
+  testing.data = rep("Wallen_2022", 6),
+  ML = c("lasso", "lasso_ll", "enet", "ridge", "ridge_ll", "random_forest"),
+  AUC = c(lasso_5x10@auc$Wallen_2022, 
+          lassoll_5x10@auc$Wallen_2022, 
+          enet_5x10@auc$Wallen_2022, 
+          ridge_5x10@auc$Wallen_2022, 
+          ridge_ll_5x10@auc$Wallen_2022, 
+          rf_5x10@auc$Wallen_2022),
+  norm = rep("log", 6))
+
+perf_log<-rbind.data.frame(perf_log,df)
+
+#csv
+csv_log<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+csv_log.w<-readRDS( "/metaG/R_analyses/Functions/AA_KO/RDS/Wallen_CSV.rds")
+csv_log.w<-subset(csv_log.w, testing.data != "Wallen_2022") # because not included in the original run
+csv_log.w$norm<-rep("log", nrow(csv_log.w))
+csv_log<-rbind.data.frame(csv_log, csv_log.w)
+# combine
+df_comb<-rbind.data.frame(perf_log, csv_log)
+
+# format to have good aesthetics
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
+df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
+df.diag<-df_comb[1:42,]
+```
+
+
+## Tile plot
+```{r}
+ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  geom_text(data = df.auc, mapping = aes(label = AUC), color = "white", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "right") +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
+  facet_wrap(~ ML)
+
+ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log.svg",
+       width = 10, 
+       height = 8)
+
+
+```
+
+
+# GMM
+```{r}
+
+perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GMM_single_5per_log.rds")
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+csv_log<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/CSV_GMM_Log_df_auc.rds")
+df_comb<-rbind.data.frame(perf_log, csv_log)
+
+
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
+df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
+df.diag<-df_comb[1:42,]
+
+```
+
+
+## Tile plot
+```{r}
+
+
+
+ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  geom_text(data = df.auc, mapping = aes(label = AUC), color = "white", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "right") +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
+  facet_wrap(~ ML)
+
+ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GMM.svg", 
+       width = 10, 
+       height = 8)
+
+
+```
+
+
+
+# GBM
+
+```{r}
+
+perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_single_5per_log.rds")
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+
+
+csv_log<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_CSV_Log_df_auc.rds")
+df_comb<-rbind.data.frame(perf_log, csv_log)
+
+
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
+df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
+df.diag<-df_comb[1:42,]
+
+```
+
+
+## Tile plot
+```{r}
+
+
+
+ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  geom_text(data = df.auc, mapping = aes(label = AUC), color = "white", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "right") +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
+  facet_wrap(~ ML)
+
+ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GBM.svg",
+       width = 10, 
+       height = 8)
+
+
+```
+
+# Combine tables
+```{r}
+library(tidyverse)
+df.sign.KOmod <- readRDS("/metaG/R_analyses/Functions/KO_modules/RDS/df.sign.KOmod.rds")
+module_pathways <- read_delim("/metaG/R_analyses/Functions/KO/module_pathways.list", col_names = FALSE)
+
+
+## Merge files
+module_pathways$X2 <- gsub("\tpath", "", module_pathways$X2)
+module_pathways$X4 <- module_pathways$X3
+module_pathways$X4 <- gsub("map", "ko", module_pathways$X4)
+module_pathways <- module_pathways %>% select(-c(1,3)) %>% rename(Module = 1, ko = 2)
+
+df.sign.KOmod_adapted <- df.sign.KOmod %>% 
+  full_join(module_pathways, by = c("bins" = "Module")) %>% 
+  drop_na(p.adjust) 
+
+# add path description
+path<-read.delim("/metaG/R_analyses/Functions/KO//pathway.list", header = FALSE)
+df.sign.KOmod_adapted$num <- gsub("ko", "", df.sign.KOmod_adapted$ko)
+df.sign.KOmod_adapted<-right_join(df.sign.KOmod_adapted, path, by = c("num" = "V1"))
+
+write.table(df.sign.KOmod_adapted, "/metaG/R_analyses/Functions/KO/RDS/Path_mod_match.txt", sep = "\t")
+
+
+```

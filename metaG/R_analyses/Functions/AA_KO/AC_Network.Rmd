@@ -1,0 +1,678 @@
+---
+title: "Network fig"
+author: "SRomano"
+output: 
+  html_document: 
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+  
+Load the required packages.
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(igraph)
+```
+
+# Load the relevant rds objects
+
+```{r}
+df.sign<-readRDS( "/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+path<-read.delim("path_filtered0.5_9May23", header = T)
+path<-path[,c(1,3,7,9)]
+path$ko<-gsub("path:", "", path$V1)
+
+mod<-read.delim("mod_filtered0.6_9May23", header = T)
+mod<-mod[,c(3,7,8, 9)]
+df.path<-readRDS("/metaG/R_analyses/Functions/AA_KO//RDS/df.sign.KOpath.rds")
+df.mod<-read.delim("/metaG/R_analyses/Functions/AA_KO/RDS/Path_mod_match.txt", 
+                   header = T, 
+                   sep = "\t",
+                   quote = "")
+
+# define formatting function
+format.igraph.df<-function(df.sign.path.subst = df.sign.path.subst,
+                           df.path = df.path,
+                           df.mod = df.mod,
+                           df.sign = df.sign){
+                  V1 = vector()
+                  V2 = vector()
+                  type1 = vector()
+                  type2 = vector()
+                  eff1 = vector()
+                  eff2 =vector()
+                  ko.da<-df.sign.path.subst$bins # this has to be the same length as the nrow for the combine df
+                  # Add link KO-path
+                  for(i in 1:length(ko.da)){
+                    if(df.sign.path.subst$ko[i] %in% df.path$bins){
+                        V1<-c(V1, df.sign.path.subst$bins[i])
+                        V2<-c(V2, df.sign.path.subst$ko[i])
+                        type1<-c(type1, "KO")
+                        eff1 <- c(eff1, df.sign[which(df.sign$bins == df.sign.path.subst$bins[i]), "TE.random"])
+                        type2<-c(type2, "path")
+                        eff2 <- c(eff2, df.path[which(df.path$bins == df.sign.path.subst$ko[i]), "TE.random"])
+                    }
+                  }
+                  # create a subset for mod
+                  tmp<-df.mod[which(df.mod$V2.x %in% unique(V2)),]
+                  # Add link mod-path
+                  for(i in 1:nrow(tmp)){
+                        V1<-c(V1, tmp$bins[i])
+                        V2<-c(V2, tmp$V2.x[i])
+                        type1<-c(type1, "mod")
+                        eff1 <- c(eff1, tmp[i, "TE.random"])
+                        type2<-c(type2, "path")
+                        eff2 <- c(eff2, df.path[which(df.path$bins == tmp$V2.x [i]), "TE.random"])
+                  }
+                  # create a subset for KO in mod
+                  tmp<-df.sign.path.subst[which(df.sign.path.subst$mod %in% tmp$bins),]
+                  # Add link KO-mod
+                  for(i in 1:nrow(tmp)){
+                        V1<-c(V1, tmp$bins[i])
+                        V2<-c(V2, tmp$ mod[i])
+                        type1<-c(type1, "KO")
+                        eff1 <- c(eff1, tmp[i, "TE.random"])
+                        type2<-c(type2, "mod")
+                        eff2 <- c(eff2, unique(df.mod[which(df.mod$bins == tmp$mod[i]), "TE.random"])) # here unique is needed as entry are repeated in this df
+                  }
+                  
+                  l_df<-list(V1,V2,type1,type2, eff1, eff2)
+                  df.form.net<-do.call(cbind, l_df) %>% as.data.frame()
+                  names(df.form.net)<-c("V1", "V2", "type1", "type2", "eff1", "eff2")
+
+                  return(df.form.net)
+                  
+}
+
+
+```
+
+# Join the KO, path, and mod
+```{R}
+
+df.sign.path<-left_join(df.sign, path, by = c("bins"= "V3"), relationship = "many-to-many")
+df.sign.path<-left_join(df.sign.path, mod, by = c("bins" = "V3"), relationship = "many-to-many")
+```
+
+# Subset manually the relevant pathways/KO
+## Secretion Systems
+```{r}
+ss<-"ko03070"
+df.sign.path.subst<-subset(df.sign.path, ko %in% ss)
+
+names(df.sign.path.subst)<-c("TE.random",
+                             "seTE.random",
+                             "lower.random",
+                             "upper.random",
+                             "pval.random",
+                             "bins",
+                             "p.adjust",
+                             "dir",
+                             "KO_def",
+                             "path",
+                             "path_perc",
+                             "descr_path",
+                             "ko",
+                             "mod_perc",
+                             "mod",
+                             "descr_mod")
+
+
+
+
+# write a loop to format a df for the igraph
+
+
+df.form.net<-format.igraph.df(df.sign.path.subst = df.sign.path.subst,
+                           df.path = df.path,
+                           df.mod = df.mod,
+                           df.sign = df.sign)
+
+
+# remove duplicates
+df.form.net<-df.form.net [!duplicated(df.form.net[c(1,2)]),]
+
+
+
+# create a df with all the attributes for the graphs
+df.merged<-data.frame(variables = c(df.form.net$V1, df.form.net$V2),
+                      type = c(df.form.net$type1, df.form.net$type2),
+                      eff = c(df.form.net$eff1, df.form.net$eff2))
+df.merged<-df.merged[!duplicated(df.merged$variables),]
+df.merged$type.levels<-as.numeric(as.factor(df.merged$type))
+
+
+# add enrichment direction + adjust eff
+df.merged$eff<-df.merged$eff %>% as.numeric()
+df.merged$dir<-ifelse(df.merged$eff > 0, "PD", "CTRL")
+df.merged$eff<-df.merged$eff %>% abs()
+
+net<-graph_from_data_frame(df.form.net,
+                         directed = F)
+plot(net)
+
+col<-adjustcolor(c("#ff6666", "#525266"), alpha.f = 0.7)
+V(net)$color<-col[ifelse(df.merged$dir == "PD", 1,2)]
+
+plot(net)
+
+# edges
+E(net)$edge.color <- "gray80"
+E(net)$width <- rep(4, length(E(net)))
+plot(net)
+size<- as.numeric(df.merged$eff)*50
+V(net)$size<-size
+```
+
+### create groups to mark
+```{r}
+#t3ss
+
+ss3<-c("K03221", # yscF
+       "K04056", "K04057", "K04059", # YscO/P/X
+       "K03219", #YscC
+       "K04058", #YscW"
+       "K03222", "K03226", "K03227", #Ysc J/R/S
+       "K03228", "K03229", "K03230", #ysc T/U/V
+      "K03225", # yscQ
+      "K03223" # yscL
+      )
+#t6ss
+
+ss6<-c("K11904", # vgrgc
+      "K11903", # HCp
+      "K11891", # Lip
+      "K11892", #DotU
+      "K11891", # icmf 
+      "K11907", #ClpV
+      "K11912", # ppka
+      "K11913", #Fha1
+      "K11915", #Pppa
+      "K11897", #ImpF
+      "K11895", #ImpM
+      "K11900", #ImpC
+      "K11896", #ImpG
+      "M00334"
+      )
+#t4ss
+
+ss4<-c("K03194", # virB1
+       "K03197", "K03198", "K03200", #Vir2/3/5
+       "K03202", "K03204", #Vir7/9
+      "K03201", "K03203", "K31095", # virb6/8/10 
+      "K03199", "K03205", "K03196" # virb 4/11 D4
+      )
+# t2ss
+ss2<-c("K02453", # gspD
+       "K02465", # gspS
+      "K02452", # gspC
+      "K02455", # gspF
+      "K02456", #gspG
+      "K02457", # gsph 
+      "K02458", # gspI
+      "K02459", # gspJ
+      "K02460", # gspK
+      "K02461", # gspL
+      "K02462", # gspM
+      "K02454", # gspE
+      "K02464", # gspO
+      "M00331"
+      )
+
+ssc<-c(
+  "K03072", "K03074", "K12257", #secDF
+  "K03073", #sedE
+  "K03075", #secG
+  "K03076", #SecY
+  "K03210", #yajC
+  "K03217", #yidC
+  "K03070", #SecA
+  "K13301", #secM
+  "K03110", #ftsY
+  "K03071", #secB
+  "K03106", #ffh
+  "M00335"
+)
+
+ss3.m<-which(df.merged$variables %in% ss3)
+ss6.m<-which(df.merged$variables %in% ss6)
+ss4.m<-which(df.merged$variables %in% ss4)
+ss2.m<-which(df.merged$variables %in% ss2)
+ssc.m<-which(df.merged$variables %in% ssc)
+
+Group1<-vector()
+for(i in 1:nrow(df.merged)){
+  if(df.merged$variables[i] %in% df.merged$variables[ss3.m]){
+    Group1<-c(Group1, 3)
+  } else if (df.merged$variables[i] %in% df.merged$variables[ss4.m]){
+     Group1<-c(Group1, 4)
+  } else if (df.merged$variables[i] %in% df.merged$variables[ss2.m]){
+     Group1<-c(Group1, 2)
+  } else if (df.merged$variables[i] %in% df.merged$variables[ss6.m]){
+     Group1<-c(Group1, 6)
+  } else if (df.merged$variables[i] %in% df.merged$variables[ssc.m]){
+    Group1<-c(Group1, 1)
+  } else {    Group1<-c(Group1, 20)}
+}
+
+G_Grouped = net
+E(G_Grouped)$weight = 1
+
+
+
+V(net)$Group1<-Group1
+for(i in unique(V(net)$Group1)) {
+    GroupV = which(V(net)$Group1 == i)
+    G_Grouped = add_edges(G_Grouped, combn(GroupV, 2), attr=list(weight=5))
+} 
+
+## Now create a layout based on G_Grouped
+set.seed(567)
+LO = layout_with_fr(G_Grouped)
+```
+
+### add triangle verte shape and change modules/path/ko shapes
+```{r}
+# triangle vertex shape
+mytriangle <- function(coords, v=NULL, params) {
+  vertex.color <- params("vertex", "color")
+  if (length(vertex.color) != 1 && !is.null(v)) {
+    vertex.color <- vertex.color[v]
+  }
+  vertex.size <- 1/200 * params("vertex", "size")
+  if (length(vertex.size) != 1 && !is.null(v)) {
+    vertex.size <- vertex.size[v]
+  }
+
+  symbols(x=coords[,1], y=coords[,2], bg=vertex.color,
+          stars=cbind(vertex.size, vertex.size, vertex.size),
+          add=TRUE, inches=FALSE)
+}
+# clips as a circle
+add_shape("triangle", clip=shapes("circle")$clip,
+                 plot=mytriangle)
+```
+
+### add vector shapes
+```{r}
+shapes.d<-vector(length = nrow(df.merged))
+for(i in 1:length(shapes.d)){
+    if(df.merged$type[i] == "KO"){
+      shapes.d[i]<-"circle"
+    } else if(df.merged$type[i] == "mod"){
+      shapes.d[i]<-"triangle"
+    } else {shapes.d[i]<-"square"} 
+
+}
+```
+
+
+### plot
+```{r}
+V(net)$label<-df.merged$variables
+V(net)$shape<-shapes.d
+
+
+
+svg("/metaG/R_analyses/Functions/AA_KO/Figures/SS.svg")
+
+plot(igraph::simplify(net, remove.multiple = F, remove.loops = T),
+     vertex.label.color="black",
+     vertex.label.font = 2,
+     vertex.label.cex = 1.2,
+     vertex.label.dist = 0,
+     vertex.label.degree = pi/4,
+     vertex.label.family = "calibri",
+     # mark.groups=list(ss3.m, ss4.m, ss6.m, ss2.m, ssc.m), mark.border=NA,
+     layout=LO,
+     vertex.label = ifelse(df.merged$type != "KO", V(net)$label, NA))
+
+dev.off()
+
+# calculate percentage KO in paths
+df.perc.path<-data.frame(path = "ko03070",
+                         tot.ko.path = nrow(subset(path, ko == "ko03070")),
+                         da.ko.path = length(which(df.sign$bins %in% subset(path, ko == "ko03070")$V3)),
+                         descr = unique(subset(path, ko == "ko03070")$description))
+```
+
+## Xenobiotics 
+```{r}
+# xenob
+xeno<-c("ko00643", "ko00633", "ko00623", "ko00361",
+        "ko00365", "ko00362", "ko00642", "ko00984",
+        "ko00364", "ko00363", "ko00930")
+df.sign.path.subst<-subset(df.sign.path, ko %in% xeno)
+
+# select only DA KO
+names(df.sign.path.subst)<-c("TE.random",
+                             "seTE.random",
+                             "lower.random",
+                             "upper.random",
+                             "pval.random",
+                             "bins",
+                             "p.adjust",
+                             "dir",
+                             "KO_def",
+                             "path",
+                             "path_perc",
+                             "descr_path",
+                             "ko",
+                             "mod_perc",
+                             "mod",
+                             "descr_mod")
+
+
+df.form.net<-format.igraph.df(df.sign.path.subst = df.sign.path.subst,
+                           df.path = df.path,
+                           df.mod = df.mod,
+                           df.sign = df.sign)
+
+
+# remove duplicates
+df.form.net<-df.form.net [!duplicated(df.form.net[c(1,2)]),]
+
+
+
+# create a df with all the attributes for the graphs
+df.merged<-data.frame(variables = c(df.form.net$V1, df.form.net$V2),
+                      type = c(df.form.net$type1, df.form.net$type2),
+                      eff = c(df.form.net$eff1, df.form.net$eff2))
+df.merged<-df.merged[!duplicated(df.merged$variables),]
+df.merged$type.levels<-as.numeric(as.factor(df.merged$type))
+
+
+# add enrichment direction + adjust eff
+df.merged$eff<-df.merged$eff %>% as.numeric()
+df.merged$dir<-ifelse(df.merged$eff > 0, "PD", "CTRL")
+df.merged$eff<-df.merged$eff %>% abs()
+
+
+net<-graph_from_data_frame(df.form.net,
+                           directed = F, )
+col<-adjustcolor(c("#ff6666", "#525266", "darkgray"), alpha.f = 0.7)
+subs.col<-ifelse(df.merged$dir == "PD", 1,2)
+
+V(net)$color<-col[subs.col]
+plot(net)
+
+# edges
+E(net)$edge.color <- "gray80"
+E(net)$width <- rep(4, length(E(net)))
+plot(net)
+size<- as.numeric(df.merged$eff)*50
+V(net)$size<-size
+```
+
+```{r}
+# triangle vertex shape
+mytriangle <- function(coords, v=NULL, params) {
+  vertex.color <- params("vertex", "color")
+  if (length(vertex.color) != 1 && !is.null(v)) {
+    vertex.color <- vertex.color[v]
+  }
+  vertex.size <- 1/200 * params("vertex", "size")
+  if (length(vertex.size) != 1 && !is.null(v)) {
+    vertex.size <- vertex.size[v]
+  }
+
+  symbols(x=coords[,1], y=coords[,2], bg=vertex.color,
+          stars=cbind(vertex.size, vertex.size, vertex.size),
+          add=TRUE, inches=FALSE)
+}
+# clips as a circle
+add_shape("triangle", clip=shapes("circle")$clip,
+                 plot=mytriangle)
+```
+
+### add vector shapes
+```{r}
+shapes.d<-vector(length = nrow(df.merged))
+for(i in 1:length(shapes.d)){
+    if(df.merged$type[i] == "KO"){
+      shapes.d[i]<-"circle"
+    } else if(df.merged$type[i] == "mod"){
+      shapes.d[i]<-"triangle"
+    } else {shapes.d[i]<-"square"} 
+
+}
+
+
+```
+
+
+### plot
+```{r}
+V(net)$label<-df.merged$variables
+V(net)$shape<-shapes.d
+
+svg("/metaG/R_analyses/Functions/AA_KO/Figures/Xeno.svg")
+
+plot(igraph::simplify(net, remove.multiple = F, remove.loops = T),
+     vertex.label.color="black",
+     vertex.label.font = 2,
+     vertex.label.cex = 1.2,
+     vertex.label.dist = 0,
+     vertex.label.degree = pi/4,
+     vertex.label.family = "calibri",
+     vertex.label = ifelse(df.merged$type != "KO", V(net)$label, NA))
+
+dev.off()
+```
+
+## Amino acids/Vitamins
+
+```{r}
+tt<-c("ko00472", "ko00350", "ko00740","ko00380", "ko00650")
+df.sign.path.subst<-subset(df.sign.path, ko %in% tt)
+
+# select only DA KO
+names(df.sign.path.subst)<-c("TE.random",
+                             "seTE.random",
+                             "lower.random",
+                             "upper.random",
+                             "pval.random",
+                             "bins",
+                             "p.adjust",
+                             "dir",
+                             "KO_def",
+                             "path",
+                             "path_perc",
+                             "descr_path",
+                             "ko",
+                             "mod_perc",
+                             "mod",
+                             "descr_mod")
+
+
+df.form.net<-format.igraph.df(df.sign.path.subst = df.sign.path.subst,
+                           df.path = df.path,
+                           df.mod = df.mod,
+                           df.sign = df.sign)
+
+
+names(df.form.net)<-c("V1", "V2", "type1", "type2", "eff1", "eff2")
+
+# remove duplicates
+df.form.net<-df.form.net [!duplicated(df.form.net[c(1,2)]),]
+
+
+
+# create a df with all the attributes for the graphs
+df.merged<-data.frame(variables = c(df.form.net$V1, df.form.net$V2),
+                      type = c(df.form.net$type1, df.form.net$type2),
+                      eff = c(df.form.net$eff1, df.form.net$eff2))
+df.merged<-df.merged[!duplicated(df.merged$variables),]
+df.merged$type.levels<-as.numeric(as.factor(df.merged$type))
+
+
+# add enrichment direction + adjust eff
+df.merged$eff<-df.merged$eff %>% as.numeric()
+df.merged$dir<-ifelse(df.merged$eff > 0, "PD", "CTRL")
+df.merged$eff<-df.merged$eff %>% abs()
+
+
+net<-graph_from_data_frame(df.form.net,
+                           directed = F, )
+col<-adjustcolor(c("#ff6666", "#525266", "darkgray"), alpha.f = 0.7)
+subs.col<-ifelse(df.merged$dir == "PD", 1,2)
+
+V(net)$color<-col[subs.col]
+plot(net)
+
+# edges
+E(net)$edge.color <- "gray80"
+E(net)$width <- rep(4, length(E(net)))
+plot(net)
+size<- as.numeric(df.merged$eff)*50
+V(net)$size<-size
+```
+
+```{r}
+# triangle vertex shape
+mytriangle <- function(coords, v=NULL, params) {
+  vertex.color <- params("vertex", "color")
+  if (length(vertex.color) != 1 && !is.null(v)) {
+    vertex.color <- vertex.color[v]
+  }
+  vertex.size <- 1/200 * params("vertex", "size")
+  if (length(vertex.size) != 1 && !is.null(v)) {
+    vertex.size <- vertex.size[v]
+  }
+
+  symbols(x=coords[,1], y=coords[,2], bg=vertex.color,
+          stars=cbind(vertex.size, vertex.size, vertex.size),
+          add=TRUE, inches=FALSE)
+}
+# clips as a circle
+add_shape("triangle", clip=shapes("circle")$clip,
+                 plot=mytriangle)
+```
+
+### add vector shapes
+```{r}
+shapes.d<-vector(length = nrow(df.merged))
+for(i in 1:length(shapes.d)){
+    if(df.merged$type[i] == "KO"){
+      shapes.d[i]<-"circle"
+    } else if(df.merged$type[i] == "mod"){
+      shapes.d[i]<-"triangle"
+    } else {shapes.d[i]<-"square"} 
+
+}
+
+
+```
+
+
+### plot
+```{r}
+V(net)$label<-df.merged$variables
+V(net)$shape<-shapes.d
+
+svg("/metaG/R_analyses/Functions/AA_KO/Figures/Other_AA.svg")
+
+plot(igraph::simplify(net, remove.multiple = F, remove.loops = T),
+     vertex.label.color="black",
+     vertex.label.font = 2,
+     vertex.label.cex = 1.2,
+     vertex.label.dist = 0,
+     vertex.label.degree = pi/4,
+     vertex.label.family = "calibri",
+     vertex.label = ifelse(df.merged$type != "KO", V(net)$label, NA)
+     )
+
+legend(x=-1.5, y=-1, c("PD","CTRL"), pch=21,
+
+       col="#777777", pt.bg=col, pt.cex=3, cex=.9, bty="n", ncol=1)
+
+
+dev.off()
+```
+
+# crate heat map
+
+```{r}
+create.df.perc.ko<-function(list.ko,
+                            path,
+                            df.sign){
+  
+  df.perc.path<-data.frame(path = vector(length = length(list.ko)),
+                         tot.ko.path = vector(length = length(list.ko)),
+                         da.ko.path = vector(length = length(list.ko)),
+                         descr = vector(length = length(list.ko)))
+
+
+  for(i in 1:length(list.ko)){
+    df.perc.path$path[i]<-list.ko[i]
+    df.perc.path$tot.ko.path[i]<-nrow(subset(path, ko == list.ko[i]))
+    df.perc.path$da.ko.path[i]<- length(which(df.sign$bins %in% subset(path, ko == list.ko[i])$V3))
+    df.perc.path$descr[i]<-unique(subset(path, ko == list.ko[i])$description)
+
+  }
+  return(df.perc.path)
+}
+
+df.perc.path<-create.df.perc.ko(list.ko = c(ss, xeno, tt),
+                                path = path,
+                                df.sign = df.sign)
+
+df.perc.path$perc<-df.perc.path$da.ko.path/df.perc.path$tot.ko.path*100
+df.perc.path$descr.ko<-paste0("[", df.perc.path$path, "] ", df.perc.path$descr)
+df.perc.path.m<-reshape2::melt(df.perc.path)
+
+library(RColorBrewer)
+nb.cols <- 3
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+
+
+
+ss.df<-subset(df.perc.path.m, variable == "perc")
+# Change the name of "[ko00361] Cl-cyclohexane and Cl-benzene degradation",
+ss.df$descr.ko[5] <-  "[ko00361] Cl-cyclohexane and Cl-benzene degradation"
+ss.df$descr.ko<-factor(ss.df$descr.ko, 
+                    levels = c("[ko03070] Bacterial secretion system",
+                               "[ko00643] Styrene degradation",
+                               "[ko00633] Nitrotoluene degradation",
+                               "[ko00623] Toluene degradation",
+                               "[ko00361] Cl-cyclohexane and Cl-benzene degradation",
+                               "[ko00365] Furfural degradation",
+                               "[ko00362] Benzoate degradation",
+                               "[ko00642] Ethylbenzene degradation",
+                               "[ko00984] Steroid degradation",
+                               "[ko00364] Fluorobenzoate degradation",
+                               "[ko00363] Bisphenol degradation",
+                               "[ko00930] Caprolactam degradation",
+                               "[ko00472] D-Arginine and D-ornithine metabolism",
+                               "[ko00350] Tyrosine metabolism",
+                               "[ko00380] Tryptophan metabolism",
+                               "[ko00740] Riboflavin metabolism",
+                               "[ko00650] Butanoate metabolism"),
+                    ordered = T)  
+
+ggplot(ss.df, aes(variable, descr.ko, fill = as.numeric(value))) +
+    geom_tile(color = "black",
+            lwd = 1,
+            linetype = 1) + 
+  theme_minimal() +
+  scale_fill_gradientn(colors = hcl.colors(20, "RdYlGn"),
+                       limits=c(4, 75), breaks=seq(5,75,by=10)) +
+  theme(axis.text.x = element_blank(),
+        panel.grid = element_blank(),
+        axis.title.x = element_blank(),
+        axis.text.y = element_text(size = 16),
+        legend.text=element_text(size=12),
+        legend.title = element_text(size =14)) +
+  labs(fill = "Percentages") +
+  ylab("Pathways")
+
+ggsave(filename = "/metaG/R_analyses/Functions/AA_KO/Figures/Heatmap.svg",
+       width = 8.5, height = 7.5)
+
+```
+
+
+
+
+

@@ -1,0 +1,213 @@
+---
+title: "Fig DA GMM"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Load data
+```{r}
+library(ggplot2)
+library(dplyr)
+meta<-readRDS("/metaG//R_analyses/Taxonomy/RDS/meta.rds")
+df.cross<-readRDS("/metaG//R_analyses/Functions/AA_KO/RDS/df.cross.GMM.rds")
+df.sign<-readRDS("/metaG//R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
+
+meta$PD[meta$PD == "HC"]<-"CTRL"
+```
+
+Make a pretty graph
+```{r}
+
+library(RColorBrewer)
+library(ggnewscale)
+library(cowplot)
+
+# single study DA
+df.cross.adj<-df.cross %>%
+  group_by(Cohort) %>%
+  mutate(padjust = p.adjust( p.value, method = "fdr"))
+
+# add dummy variable
+df.cross.adj$counts<-ifelse(df.cross.adj$padjust < 0.05 & df.cross.adj$estimate > 0, 1, 0)
+df.cross.adj$counts.hc<-ifelse(df.cross.adj$padjust < 0.05 & df.cross.adj$estimate < 0, 1, 0)
+
+# sum for genera
+df.cross.adj<- df.cross.adj %>%
+  group_by(bin) %>%
+  mutate(tot.sign.taxa = sum(counts),
+         tot.sign.taxa.hc = sum(counts.hc))
+
+df.sign.uniq<-subset(df.cross.adj[!duplicated(df.cross.adj$bin),], bin %in% df.sign$bins)
+df.sign<-df.sign[order(df.sign$TE.random, decreasing = T),]
+df.sign.uniq<-df.sign.uniq %>% arrange(factor(bin, levels = df.sign$bins))
+
+df.sign.uniq$TE<-vector(length = nrow(df.sign.uniq))
+for(i in 1:nrow(df.sign.uniq)){
+  df.sign.uniq$TE[i]<-df.sign[which(df.sign$bins == df.sign.uniq$bin[i]),]$TE.random
+}
+df.sign.uniq$bin<-factor(df.sign.uniq$bin, levels = unique(df.sign.uniq$bin))
+
+
+(s.g<-
+ggplot(df.sign.uniq, aes(x = tot.sign.taxa, y =reorder(bin, -TE))) +
+      geom_bar(mapping = aes(x = tot.sign.taxa + tot.sign.taxa.hc, y =reorder(bin, -TE)), stat = "identity", fill = "#525266", color = "black", size = 0.5) +
+  geom_bar(stat = "identity", fill = "#ff6666", color = "black", size = 0.5) +
+  theme_bw() +
+  theme(axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.text = element_text(size=13)) +
+  labs(y = "Genera",
+       x = "#Studies")+
+      scale_x_continuous(breaks = c(0,1,2,3,4,5), limits = c(0,5)))
+
+# add the ML coefficients
+df.pos.neg<-readRDS("/metaG//R_analyses/Functions/AA_KO/RDS//Ridge_df.pos.neg.GMM.rds")
+df.pos.neg<-subset(df.pos.neg, taxa %in% df.sign$bins)
+
+# Format for plotting
+df.pos.neg$taxa<-factor(df.pos.neg$taxa, levels = df.sign$bins, ordered = T)
+
+# add dir of enrichment 
+df.sign$dir<-ifelse(df.sign$TE.random<0, "HC", "PD")
+
+df.pos.neg$dir<-vector(length = nrow(df.pos.neg))
+for(i in 1:nrow(df.pos.neg)){
+  df.pos.neg$dir[i]<-df.sign[df.sign$bins == df.pos.neg$taxa[i],]$dir
+}
+
+(ridge.ef<-ggplot(df.pos.neg, aes( x = -average, y = taxa)) +
+        geom_errorbarh(mapping = aes(xmin = -average - stdev, 
+                                     xmax = -average + stdev), 
+                                     height = 0.3,
+                                     linewidth = 0.3) +
+        geom_point(size = 4, pch = 21, mapping = aes(fill = factor(dir))) +
+        scale_fill_manual(values = c("#525266","#ff6666")) +
+       scale_x_continuous(name = "Rel. average coeff.",
+                       breaks=c(-0.04,0,0.04), 
+                       limits=c(-0.04,0.04)) +
+        theme_bw() +
+        theme(axis.text.y = element_blank(),
+              axis.text.x = element_text(size = 13),
+              axis.ticks.y = element_blank(),
+              axis.title.y = element_blank(),
+              legend.position = "none") +
+        geom_vline(xintercept = 0, colour = "gray", linetype=2))
+
+(g<-ggplot(df.sign, aes(x = TE.random, y = reorder(descr, -TE.random))) +
+  geom_errorbar(aes(xmin=lower.random, xmax=upper.random), width=.5) +
+  geom_point(pch = 21, size = 5, alpha = 1, mapping = aes(fill = dir), stroke = 0.5) +
+  theme_bw() +
+  scale_fill_manual(values = c("#525266", "#ff6666")) +
+  labs(fill = "Condition",
+       y = "GMM",
+       x = "Gen. Odds") +
+  geom_hline(yintercept = 0, colour = "gray", linetype=2) +
+  geom_vline(xintercept = 0, colour = "gray", linetype=2) +
+  theme(legend.position = "right",
+        legend.key.size = unit(0.4, "cm"),
+        legend.direction = "vertical") +
+  theme(axis.title.y = element_text(size = 14),
+        legend.position = c(0.98, 0.98),
+        legend.justification = c("right", "top"),
+        legend.box.just = "right",
+        legend.margin = margin(2, 2, 2, 2),
+        axis.text = element_text(size =13)) +
+  labs( fill = "Condition"))
+
+# make titles
+title <- ggdraw() + 
+  draw_label(
+    "Differentially abundant GMMss between CTRL and PD",
+    fontface = 'bold',
+    x = 0.05,
+    y = 0.7,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+subtitle <- ggdraw() + 
+  draw_label(
+    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1325",size = 12,
+    x = 0.05, y = 0.7,
+    hjust = 0
+  ) +
+  theme(
+    # add margin on the left of the drawing canvas,
+    # so title is aligned with left edge of first plot
+    plot.margin = margin(0, 0, 0, 7)
+  )
+
+
+# make a graph
+p.gg<-cowplot::plot_grid(g, s.g, ridge.ef,
+                         ncol = 3, 
+                         rel_widths = c(5,1,1), 
+                         align = "h", 
+                         labels = "AUTO",
+                         label_x = c(0,-0.07, -0.07))
+
+pgg<-plot_grid(
+  title, subtitle, p.gg,
+  ncol = 1,
+  # rel_heights values control vertical title margins
+  rel_heights = c(0.02, 0.02, 1))
+
+cowplot::save_plot(pgg, 
+          filename = "/metaG/R_analyses//Functions/AA_KO/Figures/GMM.GenODDs_prev.svg", 
+          base_width = 14, 
+          base_height = 8)
+
+write.table(df.sign, "/metaG/R_analyses/Functions/AA_KO/df.sign.GMM.txt",
+            quote = F,
+            col.names = T,
+            row.names = F,
+            sep = "\t")
+write.table(df.pos.neg, "/metaG/R_analyses/Functions/AA_KO/df.pos.neg.GMM.txt",
+            quote = F,
+            col.names = T,
+            row.names = F,
+            sep = "\t")
+```
+
+
+
+# Save a table
+```{r}
+
+all(df.sign$bins == df.sign.uniq$bin)
+
+supp.table<-data.frame(GMM_ID = df.sign$bins,
+                       description = df.sign$descr, 
+                       effect.size = df.sign$TE.random,
+                       SE = df.sign$seTE.random,
+                       CI.upper = df.sign$upper.random,
+                       CI.lower = df.sign$lower.random,
+                       direction.enrich = df.sign$dir,
+                       p.value.meta = df.sign$pval.random,
+                       q.value = df.sign$p.adjust,
+                       times.sign.PD = df.sign.uniq$tot.sign.taxa,
+                       times.sign.CTRL = df.sign.uniq$tot.sign.taxa.hc,
+                       average.ridge.weight = vector(length = nrow(df.sign)),
+                       stdev.ridge.weight = vector(length = nrow(df.sign)))
+
+for(i in 1:nrow(supp.table)){
+  # add average and stdev
+  supp.table$average.ridge.weight[i]<-df.pos.neg[df.pos.neg$taxa == supp.table$GMM_ID[i],"average"][1,1] %>% unlist() *-1
+  supp.table$stdev.ridge.weight[i]<-df.pos.neg[df.pos.neg$taxa == supp.table$GMM_ID[i],"stdev"][1,1] %>% unlist()
+}
+
+
+
+head(supp.table)
+dim(supp.table)
+write.table(x = supp.table, 
+            file = "/metaG//R_analyses/Functions/AA_KO/RDS/DA.table.complete_GMM.txt",
+            col.names = T, 
+            row.names = F, 
+            quote = F,
+            sep = "\t")
+```
