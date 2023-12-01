@@ -1,0 +1,738 @@
+---
+title: "PD_drugs"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+download metadata from here https://zenodo.org/records/7183678
+ 
+
+```{r}
+library("readxl")
+library("tidyverse")
+set.seed(987)
+m.w <- read_excel("Supplementary-Tables_Boktor/Supplementary-Tables/Table_S10 Sample-Metadata.xlsx", sheet = "reformat_to_match_ids")
+names(m.w)
+
+```
+
+Select the medications
+```{r}
+vars<-c(1, 13, 21:28)
+m.w<-m.w[, vars]
+```
+
+Match ids with sample names
+```{r}
+meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta$Study <- as.character(meta$Study)
+meta.b<-subset(meta, Study == "Boktor_2_2023" | Study == "Boktor_1_2023")
+
+# join the two
+all(m.w$tube_id %in% meta.b$Other)
+m.w<-left_join(m.w, meta.b, by = c("tube_id" = "Other"))
+
+# Select only PD now
+m.w.m.pd<-subset(m.w, PD == "PD")
+
+
+m.w.m.pd$dopamine_agonists[m.w.m.pd$dopamine_agonists == "not provided"]<- NA
+m.w.m.pd$dopamine_agonists<-as.factor(m.w.m.pd$dopamine_agonists)
+unique(m.w.m.pd$dopamine_agonists)
+
+m.w.m.pd$ropinirole[m.w.m.pd$ropinirole == "not provided"]<- NA
+m.w.m.pd$ropinirole<-as.factor(m.w.m.pd$ropinirole)
+unique(m.w.m.pd$ropinirole)
+
+m.w.m.pd$amantadine[m.w.m.pd$amantadine == "not provided"]<- NA
+m.w.m.pd$amantadine<-as.factor(m.w.m.pd$amantadine)
+unique(m.w.m.pd$amantadine)
+
+m.w.m.pd$MAO_B_inhibitors[m.w.m.pd$MAO_B_inhibitors == "not provided"]<- NA
+m.w.m.pd$MAO_B_inhibitors<-as.factor(m.w.m.pd$MAO_B_inhibitors)
+unique(m.w.m.pd$MAO_B_inhibitors)
+
+m.w.m.pd$rasagiline[m.w.m.pd$rasagiline == "not provided"]<- NA
+m.w.m.pd$rasagiline<-as.factor(m.w.m.pd$rasagiline)
+unique(m.w.m.pd$rasagiline)
+
+m.w.m.pd$selegiline[m.w.m.pd$selegiline == "not provided"]<- NA
+m.w.m.pd$selegiline<-as.factor(m.w.m.pd$selegiline)
+unique(m.w.m.pd$selegiline)
+
+m.w.m.pd$carbidopa[m.w.m.pd$carbidopa == "not provided"]<- NA
+m.w.m.pd$carbidopa<-as.factor(m.w.m.pd$carbidopa)
+unique(m.w.m.pd$carbidopa)
+
+m.w.m.pd$levodopa[m.w.m.pd$levodopa == "not provided"]<- NA
+m.w.m.pd$levodopa<-as.factor(m.w.m.pd$levodopa)
+unique(m.w.m.pd$levodopa)
+
+
+m.w.m.pd$PD[m.w.m.pd$levodopa == "not provided"]<- NA
+m.w.m.pd$levodopa<-as.factor(m.w.m.pd$levodopa)
+unique(m.w.m.pd$levodopa)
+
+
+# check if metadata if formatted well
+sapply(m.w.m.pd, unique)
+```
+
+# define function to run lm
+```{r}
+lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd){
+  # define the df to return
+  df<-data.frame(feats = vector(length = ncol(log_kop_w)),
+               MAO_B_inhibitors.pvale = vector(length = ncol(log_kop_w)),
+               MAO_B_inhibitors.est = vector(length = ncol(log_kop_w)),
+              
+               carbidopa.pvale = vector(length = ncol(log_kop_w)),
+               carbidopa.est = vector(length = ncol(log_kop_w)),
+
+               dopamine_agonists.pvale = vector(length = ncol(log_kop_w)),
+               dopamine_agonists.est = vector(length = ncol(log_kop_w)),
+
+               levodopa.pvale = vector(length = ncol(log_kop_w)),
+               levodopa.est = vector(length = ncol(log_kop_w)),
+
+               rasagiline.pvale = vector(length = ncol(log_kop_w)),
+               rasagiline.est = vector(length = ncol(log_kop_w)),
+
+               ropinirole.pvale = vector(length = ncol(log_kop_w)),
+               ropinirole.est = vector(length = ncol(log_kop_w)),
+
+               selegiline.pvale = vector(length = ncol(log_kop_w)),
+               selegiline.est = vector(length = ncol(log_kop_w)),
+               
+               amantadine.pvale = vector(length = ncol(log_kop_w)),
+               amantadine.est = vector(length = ncol(log_kop_w)))
+
+  # run the for loop for each feats for building lms
+    for(i in 1:ncol(log_kop_w)){
+      df$feats[i]<-names(log_kop_w)[i]
+      tmp<-log_kop_w[,i]
+      stopifnot(all(rownames(tmp) == m.w.m.pd$SampleID))
+      tmp<-cbind.data.frame(bins = tmp, m.w.m.pd)
+      # transform not provided in NA
+      tmp[tmp == "not provided"]<- NA
+      
+      x<-try(mod<-nlme::lme(bins ~ MAO_B_inhibitors, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+        df$MAO_B_inhibitors.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$MAO_B_inhibitors.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+        df$MAO_B_inhibitors.pvale[i]<-NA
+        df$MAO_B_inhibitors.est[i]<-NA
+      }
+    
+      x<-try(mod<-nlme::lme(bins ~ carbidopa, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+        df$carbidopa.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$carbidopa.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+        df$carbidopa.pvale[i]<-NA
+        df$carbidopa.est[i]<-NA
+      }
+    
+      x<-try(mod<-nlme::lme(bins ~ dopamine_agonists, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+        df$dopamine_agonists.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$dopamine_agonists.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+        df$dopamine_agonists.pvale[i]<-NA
+        df$dopamine_agonists.est[i]<-NA
+      }
+      
+      x<-try(mod<-nlme::lme(bins ~ levodopa, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+          df$levodopa.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+          df$levodopa.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+         df$levodopa.pvale[i]<-NA
+         df$levodopa.est[i]<-NA
+      }
+    
+      x<-try(mod<-nlme::lme(bins ~ rasagiline, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+        if(class(x) != "try-error"){
+          df$rasagiline.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+          df$rasagiline.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+        } else {
+          df$rasagiline.pvale[i]<-NA
+          df$rasagiline.est[i]<-NA
+        }
+    
+      x<-try(mod<-nlme::lme(bins ~ ropinirole, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+        df$ropinirole.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$ropinirole.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+        df$ropinirole.pvale[i]<-NA
+        df$ropinirole.est[i]<-NA
+      }
+      
+      x<-try(mod<-nlme::lme(bins ~ selegiline, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+      if(class(x) != "try-error"){
+        df$selegiline.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$selegiline.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+      } else {
+        df$selegiline.pvale[i]<-NA
+        df$selegiline.est[i]<-NA
+      }
+      
+       x<-try(mod<-nlme::lme(bins ~ amantadine, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude"))
+       if(class(x) != "try-error"){
+        df$amantadine.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+        df$amantadine.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+       } else {
+        df$amantadine.pvale[i]<-NA
+        df$amantadine.est[i]<-NA
+       }
+    }
+  # adjusted p-values
+  df$MAO_B_inhibitors.pvale.adj<-p.adjust(df$MAO_B_inhibitors.pvale, "fdr")
+  df$carbidopa.pvale.adj<-p.adjust(df$carbidopa.pvale, "fdr")
+  df$dopamine_agonists.pvale.adj<-p.adjust(df$dopamine_agonists.pvale, "fdr")
+  df$levodopa.pvale.adj<-p.adjust(df$levodopa.pvale, "fdr")
+  df$rasagiline.pvale.adj<-p.adjust(df$rasagiline.pvale, "fdr")
+  df$ropinirole.pvale.adj<-p.adjust(df$ropinirole.pvale, "fdr")
+  df$selegiline.pvale.adj<-p.adjust(df$selegiline.pvale, "fdr")
+  df$amantadine.pvale.adj<-p.adjust(df$amantadine.pvale, "fdr")
+
+  return(df)
+}
+
+
+
+```
+Load data and sign data and make models
+
+## KO path
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+  
+
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$description
+  
+  }
+}
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
+
+```
+
+## KO mod
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/all_no0_TSS_KOmod.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop[m.w.m.pd$SampleID]))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+  
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$description
+  
+  }
+}
+
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOm_lmm.RData")
+
+```
+
+## KO
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RData/df.sign.KO.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop[m.w.m.pd$SampleID]))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$Def
+  
+  }
+}
+
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KO_lmm.RData")
+
+```
+
+## Taxa
+```{r}
+kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop[m.w.m.pd$SampleID]))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-NA
+  
+  }
+}
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_tax_lmm.RData")
+
+```
+
+## GMM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RData/df.sign.GMM.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop[m.w.m.pd$SampleID]))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$descr
+  
+  }
+}
+
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GMM_lmm.RData")
+
+```
+
+## GBM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
+# select samples
+kop<-kop[,m.w.m.pd$SampleID]
+dim(kop)
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RData/df.sign.GBM.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop[m.w.m.pd$SampleID]))
+
+# order samples
+m.w.m.pd<-m.w.m.pd[order(m.w.m.pd$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
+
+# run lms
+df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+                      metadata = m.w.m.pd)
+
+```
+
+```{r}
+# check order is the same
+df<-df[order(df$feats),]
+df.sign<-df.sign[order(df.sign$bins),]
+stopifnot(all(df$feats == df.sign$bins))
+
+for(i in 1:nrow(df)){
+  # add 1 to NA to avoid crush
+  df[is.na(df)]<-1
+  if(any(df[i,][,18:25] < 0.05)){
+    df$conf[i]<-"Potentially_conf"
+  } else {df$conf[i]<-"Not_conf"} 
+}
+
+# check whether the Potentially_confounded ones have an enrichment in the same direction as DA-meta
+Potentially_conf<-subset(df, conf == "Potentially_conf")$feats
+
+# make workflow to check pvalues and est concordance in lm
+df.conf<-df[which(df$feats %in% Potentially_conf),]
+
+tmp<-df.conf[, grep(".*adj", names(df.conf))]
+tmp.es<-df.conf[, grep(".*est", names(df.conf))]
+if(nrow(df.conf) != 0){
+  for(i in 1:nrow(df.conf) ){
+    id<-which(tmp[i,]<0.05)
+    if(length(id) > 0){
+      est<-tmp.es[i,id]
+      if(all(est > 0)){
+        df.conf$Conc[i]<-"Drug_enriched"
+      } else if(all(est < 0)) {
+        df.conf$Conc[i]<-"Drug_depleted"
+      } else {df.conf$Conc[i]<-"Discordant"}
+    }
+    v<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    if(df.conf$Conc[i] == "Drug_depleted" & v < 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_depleted"
+    } else if (df.conf$Conc[i] == "Drug_enriched" & v > 0){
+      df.conf$est.DA.lm[i]<-"Drug_PD_enriched"
+      } else if (df.conf$Conc[i] == "Discordant"){
+        df.conf$est.DA.lm[i]<-"Drug_discordant"
+      } else {df.conf$est.DA.lm[i]<-"Drug_PD_opposit"
+      }
+    df.conf$DA.est[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$TE.random
+    df.conf$descr[i]<-df.sign[df.sign$bins == df.conf$feats[i],]$descr
+  
+  }
+}
+
+
+
+save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GBM_lmm.RData")
+
+```

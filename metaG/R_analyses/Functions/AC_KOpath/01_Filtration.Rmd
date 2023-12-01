@@ -1,0 +1,102 @@
+---
+title: "KOpath filtration"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+
+library(dplyr)
+source("/Scripts/Pevalence_functions.r")
+```
+
+# Load metadata + datasets
+```{r}
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+all.g<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+```
+
+# Clen data
+```{r}
+dim(meta)
+dim(all.g)
+
+meta<-meta[order(meta$SampleID),]
+all.g<-all.g[, order(names(all.g))]
+if((all(meta$SampleID == names(all.g)))){
+  print("All SampleID in meta are the same as in the Abund table")
+} else {stop("meta and Abund table do not have the same samples")}
+
+```
+
+remove taxa w 0 counts -> rows
+remove samples with 0 counts -> cols
+```{r}
+if(length(which(rowSums(all.g)==0)) > 0){
+  print("Removing taxa with 0 counts, most likely due to sample filtration")
+  message(paste0("There are ", length(which(rowSums(all.g)==0)), " taxa with 0 counts. removed!"))
+  all.g<-all.g[-1*which(rowSums(all.g)==0),]
+} else {print("No taxa with 0 counts")}
+
+if(length(all.g[, colSums(all.g)==0])  > 0){
+  print("Removing samples with 0 counts, most likely due to sample filtration")
+  message(paste0("There are ",length(which(colSums(all.g)==0)), " samples with 0 counts. removed!"))
+  all.g<-all.g[,-1*which(colSums(all.g)==0)]
+} else {print("No samples with 0 counts")}
+
+```
+
+
+# Filtrations 
+```{r}
+all.g<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
+
+print("Convert the data into numeric")
+for(i in 1:length(all.g)){
+  tax<-row.names(all.g[[i]])
+  all.g[[i]]<-apply(all.g[[i]], as.numeric, MARGIN = 2) %>% as.data.frame()
+  row.names(all.g[[i]])<-tax
+}
+
+print("Remove taxa with 0 and samples with 0")
+for(i in 1:length(all.g)){
+  message(paste0("There are ", length(which(rowSums(all.g[[i]])==0)), " taxa with 0 counts. removed!"))
+  all.g[[i]]<-all.g[[i]][which(rowSums(all.g[[i]])!=0),]
+}
+
+
+print("Remove samples with 0 and samples with 0")
+for(i in 1:length(all.g)){
+  message(paste0("There are ",length(which(colSums(all.g[[i]])==0)), " samples with 0 counts. removed!"))
+  all.g[[i]]<-all.g[[i]][,which(colSums(all.g[[i]])!=0)]
+
+}
+
+all.g<-lapply(all.g, function(x) x[,which(names(x) %in% meta$SampleID)])
+
+x<-unlist(lapply(all.g, function(x) names(x)))
+
+if(all(x[order(x)] == meta$SampleID)){
+  print("all Abund table have the same samples than meta")
+  saveRDS(all.g, "/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
+} else {message("Samples in meta and abund table do not match!")}
+
+
+
+```
+
+# Calculate and save filtration
+```{r}
+l_df<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
+spec_5x10<-prevalence.matching(l_df, n.studies = 2, prev = 5) 
+saveRDS(spec_5x10, "/metaG/R_analyses/Functions/AC_KOpath/RDS/spec_5x10.rds")
+
+
+```

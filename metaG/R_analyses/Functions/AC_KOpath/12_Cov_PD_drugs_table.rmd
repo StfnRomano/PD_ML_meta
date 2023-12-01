@@ -1,0 +1,93 @@
+---
+title: "PD_drugs_table"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+df.perc<-data.frame(Microbiome.features = c("KO", "KO_mod", "KO_path", "GMM", "GBM", "mOTUs"),
+                    prop.conf = vector(length = 6))
+
+
+# KO
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KO_lmm.RData")
+df.conf$type<-rep("KO", nrow(df.conf))
+df.form<-df.conf
+df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.KO.rds")
+df.perc$prop.conf[1]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# K_mod
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOm_lmm.RData")
+df.conf$type<-rep("KO_mod", nrow(df.conf))
+df.form<-rbind.data.frame(df.form, df.conf)
+df.sign<-readRDS("metaG/R_analyses/Functions/KO_modules//RDS/df.sign.KOmod.rds")
+df.perc$prop.conf[2]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# k_path
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
+df.conf$type<-rep("KO_path", nrow(df.conf))
+df.form<-rbind.data.frame(df.form, df.conf)
+df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+df.perc$prop.conf[3]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# GMM
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GMM_lmm.RData")
+df.conf$type<-rep("GMM", nrow(df.conf))
+df.form<-rbind.data.frame(df.form, df.conf)
+df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GMM.rds")
+df.perc$prop.conf[4]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# GBM
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GBM_lmm.RData")
+df.conf$type<-rep("GBM", nrow(df.conf))
+df.form<-rbind.data.frame(df.form, df.conf)
+df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GBM.rds")
+df.perc$prop.conf[5]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# motus
+load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_tax_lmm.RData")
+df.conf$type<-rep("mOTUs", nrow(df.conf))
+df.form<-rbind.data.frame(df.form, df.conf)
+df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+df.perc$prop.conf[6]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
+
+# reformat and rename rename
+df.form<-data.frame(Microbiome.features = df.form$feats,
+                    MAO_B_inhibitors.pvale = df.form$MAO_B_inhibitors.pvale,
+                    MAO_B_inhibitors.pvale.adj = df.form$MAO_B_inhibitors.pvale.adj,
+                    MAO_B_inhibitors.est = df.form$MAO_B_inhibitors.est,
+                    carbidopa.pvale = df.form$carbidopa.pvale,
+                    carbidopa.pvale.adj = df.form$carbidopa.pvale.adj,
+                    carbidopa.pvale.adj = df.form$carbidopa.est,
+                    dopamine_agonists.pvale = df.form$dopamine_agonists.pvale,
+                    dopamine_agonists.pvale.adj = df.form$dopamine_agonists.pvale.adj,
+                    dopamine_agonists.est = df.form$dopamine_agonists.est,
+                    levodopa.pvale = df.form$levodopa.pvale,
+                    levodopa.pvale.adj = df.form$levodopa.pvale.adj,
+                    levodopa.est = df.form$levodopa.est,
+                    rasagiline.pvale = df.form$rasagiline.pvale,
+                    rasagiline.pvale.adj = df.form$rasagiline.pvale.adj,
+                    rasagiline.est = df.form$rasagiline.est,
+                    ropinirole.pvale = df.form$ropinirole.pvale,
+                    ropinirole.pvale.adj = df.form$ropinirole.pvale.adj,
+                    selegiline.pvale = df.form$selegiline.pvale,
+                    selegiline.pvale.adj = df.form$selegiline.pvale.adj,
+                    selegiline.est = df.form$selegiline.est,
+                    amantadine.pvale = df.form$amantadine.pvale,
+                    amantadine.pvale.adj = df.form$amantadine.pvale.adj,
+                    amantadine.est  = df.form$amantadine.est,
+                    drug.concordance = df.form$Conc,
+                    DA.meta.est = df.form$DA.est,
+                    drug.PD.concordance = df.form$est.DA.lm,
+                    description = df.form$descr,
+                    feature.type = df.form$type)
+
+write.table(df.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt", 
+            quote = F, sep = "\t", row.names = F, col.names = T)
+
+df.perc$pot.conf<-rep("PD.medications", nrow(df.perc))
+df.perc
+saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
+```
+

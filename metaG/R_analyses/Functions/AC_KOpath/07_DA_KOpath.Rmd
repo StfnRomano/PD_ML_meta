@@ -1,0 +1,135 @@
+---
+title: "DA KOpath"
+author: "SRomano"
+output: 
+  html_document: 
+    toc: yes
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr", "meta", "genodds")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+library(dplyr)
+library(genodds)
+library(meta)
+
+
+set.seed(9821)
+```
+
+Load the data 
+```{r}
+
+l_df<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+
+meta %>%
+  group_by(Study, PD) %>%
+  summarise(n = n()) %>%
+  print( n = 50)
+
+dim(meta)
+lapply(l_df, dim)
+
+#check the order is the same in all
+x<-unlist(lapply(l_df, function(x) names(x)))
+all(sort(x) == sort(meta$SampleID))
+```
+
+# Format properly
+```{r}
+# rename to use with the genodd function
+names(meta)<-c("Sample_ID", "PD", "Other", "Cohort")
+meta$PD<-factor(meta$PD, levels = c("HC", "PD"))
+meta<-meta[order(meta$Sample_ID),]
+
+# I need to transpose it for the DA
+l_df<-lapply(l_df, function(x) as.data.frame(t(x)))
+```
+# Filter
+```{r}
+spec<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/spec_5x10.rds")
+
+l_df<-lapply(l_df, function(x) x[,which(names(x) %in% spec)])
+l_df<-lapply(l_df, function(x) x[order(rownames(x)),])
+
+```
+
+# Caluclate DA
+## GenOdds
+```{r, message =F, warning =F, error=FALSE}
+# source the function
+source("/R_analyses_metaG/Pre_processing_functions/DA_function_gen_odd.R")
+
+df.cross<-calcualte_da_genOdds(list.df = l_df, 
+                meta = meta,
+                treat = "PD", assume_no_effect = TRUE)
+saveRDS(df.cross, "/metaG/R_analyses/Functions/AC_KOpath//RDS/df.cros.KOpath.rds")
+
+```
+
+## Perform meta
+
+```{r}
+bins<-unique(df.cross$bin)
+
+df<-data.frame(TE.random = vector(),
+                 seTE.random = vector(),
+                 lower.random = vector(),
+                 upper.random = vector(),
+                 pval.random = vector(),
+                 bins = vector())
+  
+for(b in 1:length(bins)){
+  require(meta)
+    tmp.bin<-df.cross[df.cross$bin == bins[b],]
+    print(b)
+        
+    print(dim(tmp.bin))
+
+    x<-try(met<-metagen(TE=estimate, seTE=std.error,data=tmp.bin, method.tau = "REML",title =bins[b], studlab = Cohort))
+    if(class(x)[1] != "try-error"){
+    met.df<-as.data.frame(c(met[c("TE.random","seTE.random", "lower.random", "upper.random", "pval.random")],bins= bins[b])) 
+    df<-rbind.data.frame(df, met.df)  
+    } else { tmp<-data.frame(TE.random =NA, seTE.random = NA, lower.random = NA, upper.random = NA, pval.random = NA, bins= bins[b])
+      df<-rbind.data.frame(df, tmp)}
+}
+
+df$p.adjust<-p.adjust(df$pval.random, method = "fdr")
+```
+
+## Subset sign
+```{r}
+subset(df,p.adjust<0.05 ) %>%
+  dim()
+df.sign<-subset(df,p.adjust<0.05 ) 
+
+# add descr
+path<-read.delim("pathway.list", header = FALSE)
+
+df.sign<-df.sign %>% 
+  mutate(num = gsub("ko", "", bins)) %>%
+  left_join(path, by = c("num" = "V1")) %>%
+  rename("description" = "V2") %>%
+  select(-num)
+  
+
+df.sign$dir<-ifelse(df.sign$TE.random<0, "CTRL", "PD")
+saveRDS(df.sign, "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+
+```
+
+# Save workspace
+```{r}
+d<-"/metaG/R_analyses/Functions/AC_KOpath/RData/"
+save.image(paste0(d, "KOpath_DA_GenOdd.RData"))
+```

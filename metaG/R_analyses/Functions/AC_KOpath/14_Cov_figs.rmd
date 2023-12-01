@@ -1,0 +1,378 @@
+---
+title: "Cov figs"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+library("readxl")
+library("tidyverse")
+library("ggplot2")
+library(RColorBrewer)
+library(ggnewscale)
+```
+
+## Match sing KO, mod and paths
+```{r}
+# match sign KOs with path and mod
+df.sign.KO <- readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+module_ko <- read_delim("module_ko.list", col_names = FALSE)
+names(module_ko)<-c("md", "mod", "KO")
+module_ko$mod<-gsub("\tko", "", module_ko$mod)
+
+pathway_ko <- read_delim("path_filtered0.5_9May23.txt", col_names = T)
+pathway_ko$V1<-gsub("path:", "", pathway_ko$V1)
+pathway_ko<-pathway_ko[,c(1,3,9)]
+names(pathway_ko)<-c("path", "KO", "desc")
+
+
+df.ko.mod.path<-df.sign.KO %>%
+  left_join(pathway_ko, by = c("bins" = "KO"),  keep = F, relationship = "many-to-many") %>%
+  left_join(module_ko, by = c("bins" = "KO"),  keep = F, relationship = "many-to-many")
+```
+## Match sing mod and paths
+```{r}
+module_p <- read_delim("metaG/R_analyses/Functions/AA_KO/Working_dir_old_files/pathway_module.list", col_names = FALSE)
+names(module_p)<-c("pt", "path", "mod")
+module_p$path<-gsub("map", "ko", gsub("\tmd", "", module_p$path))
+df.sign.m <- readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+
+# same mods can be in multiple paths
+df.sign.m.path<-df.sign.m %>%
+  left_join(module_p, by = c("bins" = "mod"),  keep = F, relationship = "many-to-many")
+```
+
+## Define the paths in Fig 6
+```{r}
+xeno<-c("ko00930",
+        "ko00363",
+        "ko00364",
+        "ko00984",
+        "ko00642",
+        "ko00362",
+        "ko00365",
+        "ko00623",
+        "ko00361",
+        "ko00633",
+        "ko00643")
+
+aav<-c("ko00650",
+       "ko00740",
+       "ko00380",
+       "ko00350",
+       "ko00472")
+
+ss<-c("ko03070")
+all.f<-c(xeno, aav, ss)
+all.f<-factor(all.f, levels = all.f, ordered = T)
+all.f.type<-c(rep("Xenobiotics", length = length(xeno)),
+              rep("AA and vitamins", length = length(aav)),
+              "Secretion systems")
+
+
+```
+
+## Plot confounds
+```{r}
+pd.conf<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt")
+meds.conf<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/Drugs.conf.tab_lmVScov_leaps.txt", quote = "")
+sex.age<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = "")
+```
+### conf PD drugs
+```{r}
+# create data frame for plotting
+
+df.pl.km<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_mod", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+df.pl.ko<-data.frame(da.feats = all.f,
+                  type.conf = rep("KO", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+df.pl.kp<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_path", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+
+# ko confound perc
+all.f<-as.character(all.f)
+ko.conf<-subset(df.ko.mod.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% pd.conf$Microbiome.features])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+
+# mod confound perc
+km.conf<-subset(df.sign.m.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% pd.conf$Microbiome.features])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+
+# define function
+form.tabs<-function(plot.table = df.pl.km,
+                    perc.table = km.conf,
+                    is.path = FALSE){
+  if(is.path == TRUE){
+      for(i in 1:nrow(plot.table)){
+        if(plot.table$da.feats[i] %in% c(pd.conf$Microbiome.features)){
+          plot.table$perc.conf[i]<-100
+        } else { plot.table$perc.conf[i]<-0 }
+      }
+    } else {for(i in 1:nrow(plot.table)){
+          if(plot.table$da.feats[i] %in% perc.table$path){ 
+              plot.table$perc.conf[i]<-perc.table[which(perc.table$path == as.character(plot.table$da.feats[i])),]$perc  
+          } else {plot.table$perc.conf[i]<-NA}
+      }
+    }
+    return(plot.table)
+}
+
+  
+
+
+df.km<-form.tabs(plot.table = df.pl.km,
+                    perc.table = km.conf)
+df.ko<-form.tabs(plot.table = df.pl.ko,
+                    perc.table = ko.conf)
+
+df.kp<-form.tabs(plot.table = df.pl.kp,
+                    perc.table = ko.conf,
+                 is.path = TRUE)
+
+df.plot<-rbind.data.frame(df.km, df.ko, df.kp)
+df.plot$da.feats<-factor(df.plot$da.feats, levels = all.f, ordered = T)
+
+# plot
+df.plot$type.conf<-factor(df.plot$type.conf, levels = c("KEGG_path", "KEGG_mod", "KO"), ordered = T)
+
+( pd.conf<-ggplot(df.plot, aes(type.conf,  da.feats, fill = perc.conf)) +
+  geom_tile() +
+  scale_fill_distiller(type = "div", palette = "BrBG") +
+  geom_text(aes(label = round(perc.conf, 1)), size = 6, color = "white", fontface = "bold") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        legend.position = "none") +
+    xlab("Kegg features") )
+
+```
+### conf other drugs
+```{r}
+# create data frame for plotting
+
+df.pl.km<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_mod", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+df.pl.ko<-data.frame(da.feats = all.f,
+                  type.conf = rep("KO", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+df.pl.kp<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_path", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+# ko confound perc
+ko.conf<-subset(df.ko.mod.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% meds.conf$Microbiome.feature])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+View(ko.conf)
+### double check this
+x<-unique(subset(df.ko.mod.path, path == "ko00350")$bins)
+conf<-unique(meds.conf$Microbiome.feature)
+
+length(conf[conf %in% x])/length(x)
+# mod confound perc
+km.conf<-subset(df.sign.m.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% meds.conf$Microbiome.feature])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+View(km.conf)
+### double check this
+x<-unique(subset(df.sign.m.path, path == "ko00740")$bins)
+conf<-unique(meds.conf$Microbiome.feature)
+
+length(conf[conf %in% x])/length(x)
+
+# define function
+form.tabs<-function(plot.table = df.pl.km,
+                    perc.table = km.conf,
+                    is.path = FALSE){
+  if(is.path == TRUE){
+      for(i in 1:nrow(plot.table)){
+        if(plot.table$da.feats[i] %in% c(meds.conf$Microbiome.feature)){
+          plot.table$perc.conf[i]<-100
+        } else { plot.table$perc.conf[i]<-0 }
+      }
+    } else {for(i in 1:nrow(plot.table)){
+          if(plot.table$da.feats[i] %in% perc.table$path){ 
+              plot.table$perc.conf[i]<-perc.table[which(perc.table$path == as.character(plot.table$da.feats[i])),]$perc  
+          } else {plot.table$perc.conf[i]<-NA}
+      }
+    }
+    return(plot.table)
+}
+
+  
+
+
+df.km<-form.tabs(plot.table = df.pl.km,
+                    perc.table = km.conf)
+df.ko<-form.tabs(plot.table = df.pl.ko,
+                    perc.table = ko.conf)
+
+df.kp<-form.tabs(plot.table = df.pl.kp,
+                    perc.table = ko.conf,
+                 is.path = TRUE)
+
+df.plot<-rbind.data.frame(df.km, df.ko, df.kp)
+names(df.plot)<-c("da.feats", "type.conf", "Percentage", "Path_type")
+df.plot$da.feats<-factor(df.plot$da.feats, levels = all.f, ordered = T)
+# plot
+df.plot$type.conf<-factor(df.plot$type.conf, levels = c("KEGG_path", "KEGG_mod", "KO"), ordered = T)
+
+df.plot$Path_type<-as.factor(df.plot$Path_type)
+(others.conf<-ggplot(df.plot, aes(type.conf,  da.feats, fill = Percentage)) +
+  geom_tile() +
+  scale_fill_distiller(type = "div", palette = "BrBG") +
+  geom_text(aes(label = round(Percentage, 1)), size = 6, color = "white", fontface = "bold") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 14),
+        legend.position = "none",
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank()) +
+    xlab("Kegg features"))
+
+```
+### sex age
+```{r}
+# create data frame for plotting
+
+df.pl.km<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_mod", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+df.pl.ko<-data.frame(da.feats = all.f,
+                  type.conf = rep("KO", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+df.pl.kp<-data.frame(da.feats = all.f,
+                  type.conf = rep("KEGG_path", length = length(all.f)),
+                  perc.conf = vector(length = length(all.f)),
+                  types = all.f.type)
+
+
+# ko confound perc
+ko.conf<-subset(df.ko.mod.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% sex.age$Microbiome.feature])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+View(ko.conf)
+### double check this
+x<-unique(subset(df.ko.mod.path, path == "ko00350")$bins)
+conf<-unique(sex.age$Microbiome.feature)
+
+length(conf[conf %in% x])/length(x)
+
+# mod confound perc
+km.conf<-subset(df.sign.m.path, path %in% all.f) %>%
+  group_by(path) %>%
+  summarise(bins_in_path = length(unique(bins)) ,
+            bins_conf = length(unique(bins[bins %in% sex.age$Microbiome.feature])),
+            perc = round(100*bins_conf/bins_in_path, 1))
+
+# define function
+form.tabs<-function(plot.table = df.pl.km,
+                    perc.table = km.conf,
+                    is.path = FALSE){
+  if(is.path == TRUE){
+      for(i in 1:nrow(plot.table)){
+        if(plot.table$da.feats[i] %in% c(sex.age$Microbiome.feature)){
+          plot.table$perc.conf[i]<-100
+        } else { plot.table$perc.conf[i]<-0 }
+      }
+    } else {for(i in 1:nrow(plot.table)){
+          if(plot.table$da.feats[i] %in% perc.table$path){ 
+              plot.table$perc.conf[i]<-perc.table[which(perc.table$path == as.character(plot.table$da.feats[i])),]$perc  
+          } else {plot.table$perc.conf[i]<-NA}
+      }
+    }
+    return(plot.table)
+}
+
+  
+
+df.km<-form.tabs(plot.table = df.pl.km,
+                    perc.table = km.conf)
+df.ko<-form.tabs(plot.table = df.pl.ko,
+                    perc.table = ko.conf)
+
+df.kp<-form.tabs(plot.table = df.pl.kp,
+                 perc.table = ko.conf,
+                 is.path = TRUE)
+
+df.plot<-rbind.data.frame(df.km, df.ko, df.kp)
+names(df.plot)<-c("da.feats", "type.conf", "Percentage", "Path_type")
+df.plot$da.feats<-factor(df.plot$da.feats, levels = all.f, ordered = T)
+
+# plot
+df.plot$Path_type<-as.factor(df.plot$Path_type)
+df.plot$type.conf<-factor(df.plot$type.conf, levels = c("KEGG_path", "KEGG_mod", "KO"), ordered = T)
+
+(sexage<-ggplot(df.plot, aes(type.conf,  da.feats, fill = Percentage)) +
+  geom_tile() +
+  scale_fill_distiller(type = "div", palette = "BrBG", limits = c(0,100)) +
+
+  geom_text(aes(label = round(Percentage, 1)), size = 6, color = "white", fontface = "bold") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 14),
+        legend.position = "left") +
+    xlab("KEGG features") +
+    ylab("KEGG pathways") +
+    new_scale_fill() +
+    geom_tile(aes(x = 0.4, 
+                y = da.feats, 
+                fill = Path_type,
+                width = 0.1)) +
+  scale_fill_manual(values = c("#FFC107", "#D81B60", "#34C045")))
+
+```
+
+## merge plots and save
+```{r}
+cowplot::plot_grid(sexage, others.conf, pd.conf,
+                   labels = "AUTO",label_size = 20, label_x = c(0.2, 0.001, 0.001), 
+                   ncol = 3, rel_widths = c(1.7,1,1)) %>%
+  cowplot::ggsave2(filename = "metaG/R_analyses/Functions/AC_KOpath/Figures/Confound.heat_Sexage.svg",
+                     height = 6, 
+                     width = 14, 
+                   device = "svg")
+```

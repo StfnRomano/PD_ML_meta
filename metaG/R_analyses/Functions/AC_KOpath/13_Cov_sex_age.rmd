@@ -1,0 +1,448 @@
+---
+title: "Sex_Age"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Download metadata from here: 
+https://zenodo.org/records/7183678
+https://zenodo.org/records/7246185
+
+```{r}
+library("readxl")
+library(tidyverse)
+```
+
+## Wallen
+```{r}
+m.w <- read_excel("Source_Data_24Oct2022_Wallen.xlsx", sheet = "subject_metadata")
+names(m.w)
+
+vars<-c(1:3, 7)
+m.w<-m.w[, vars]
+meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta.w<-subset(meta, Study == "Wallen_2022")
+
+# join the two
+all(meta.w$Other %in% m.w$sample_name)
+all(m.w$sample_name  %in% meta.w$Other)
+
+
+m.w.m<-left_join(m.w, meta.w, by = c("sample_name" = "Other"))
+names(m.w.m)<-c("sample_name", "Case", "Sex", "Age", "SampleID", "PD", "Study")
+```
+
+## Boktor
+```{r}
+m.w <- read_excel("Supplementary-Tables_Boktor/Supplementary-Tables/Table_S10 Sample-Metadata.xlsx", sheet = "reformat_to_match_ids")
+names(m.w)
+vars<-c(1, 13, 9, 12)
+m.w<-m.w[, vars]
+meta.b<-subset(meta, Study == "Boktor_2_2023" | Study == "Boktor_1_2023")
+
+# join the two
+m.w<-m.w[order(m.w$tube_id),]
+meta.b<-meta.b[order(meta.b$Other),]
+all(m.w$tube_id == meta.b$Other)
+
+m.w<-left_join(m.w, meta.b, by = c("tube_id" = "Other"))
+
+```
+# Bedarf
+```{r}
+m.bf <- read_excel("Supplementary-Tables_Boktor/Bonn_covariate_metadata.xlsx")
+names(m.bf)
+vars<-c(1, 3, 4, 6,  10)
+m.bf<-m.bf[, vars]
+m.bf$alias<-gsub("-", ".", m.bf$alias)
+meta.bf<-subset(meta, Study == "Bedarf_2017")
+
+# join the two
+m.bf<-m.bf[order(m.bf$alias),]
+meta.bf<-meta.bf[order(meta.bf$SampleID),]
+all(m.bf$alias == meta.bf$SampleID)
+
+m.bf<-left_join(m.bf, meta.bf, by = c("alias" = "SampleID"))
+
+meta.all<-data.frame(SampleID = c(m.w.m$SampleID, m.w$SampleID, m.bf$alias),
+                     age = c(m.w.m$Age, m.w$host_age, m.bf$host_age),
+                     sex =  c(m.w.m$Sex, m.w$sex,  m.bf$sex),
+                     PD =  c(m.w.m$PD, m.w$PD, m.bf$PD),
+                     Study =  c(m.w.m$Study, m.w$Study, m.bf$Study))
+
+# harmonize entries 
+meta.all$sex[meta.all$sex == "female"]<-"F"
+meta.all$sex[meta.all$sex == "male"]<-"M"
+unique(meta.all$sex)
+
+meta.all$age[meta.all$age == "not provided"]<-NA
+meta.all$age[meta.all$age == "not collected"]<-NA
+meta.all$age<-as.numeric(meta.all$age)
+unique(meta.all$age)
+meta.all$sex<-as.factor(meta.all$sex)
+meta.all$Study<-factor(meta.all$Study, levels = c("Wallen_2022",   "Boktor_2_2023", "Boktor_1_2023", "Bedarf_2017" ))
+meta.all$PD<-as.factor(meta.all$PD)
+
+sapply(meta.all, unique)
+class(meta.all$age)
+
+```
+# Define function
+```{r}
+lm.conf<-function(microbiome.feats = log_kop,
+                  metadata = meta.all,
+                  select.desc = "descr"){
+    
+  df.estimates<-data.frame(feats = vector(length = ncol(microbiome.feats)),
+                   p.value.sex.age.PD = vector(length = ncol(microbiome.feats)),
+                   est.sex.age.PD = vector(length = ncol(microbiome.feats)),
+                   p.value.PD = vector(length = ncol(microbiome.feats)),
+                   est.PD =  vector(length = ncol(microbiome.feats)),
+                   p.value.sex = vector(length = ncol(microbiome.feats)),
+                   est.sex =  vector(length = ncol(microbiome.feats)),
+
+                   p.value.age = vector(length = ncol(microbiome.feats)),
+                   est.age =  vector(length = ncol(microbiome.feats)),
+
+                   description =  vector(length = ncol(microbiome.feats)))
+    
+    for(i in 1:ncol(microbiome.feats)){
+      id<-names(microbiome.feats)[i]
+
+      print(paste0(i, " of ", ncol(microbiome.feats)))
+      tmp<-microbiome.feats[,id]
+      stopifnot(all(rownames(tmp) == metadata$SampleID))
+      tmp<-cbind.data.frame(bins = tmp, metadata)
+      tmp$age<-as.numeric(tmp$age)
+      tmp$sex<-as.factor(tmp$sex)
+      tmp$PD<-as.factor(tmp$PD)
+      mod<-nlme::lme(bins ~ sex + age + PD, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude")
+      df.estimates$feats[i]<-id
+      df.estimates$p.value.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[4]
+      df.estimates$est.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[4]
+
+      df.estimates$p.value.sex[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+      df.estimates$est.sex[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+
+      df.estimates$p.value.age[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[3]
+      df.estimates$est.age[i]<-as.data.frame(summary(mod)$tTable)$Value[3]
+
+      mod<-nlme::lme(bins ~ PD, random = ~ 1 | Study,
+               data = tmp, na.action = "na.exclude")
+      df.estimates$feats[i]<-id
+      df.estimates$p.value.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
+      df.estimates$est.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
+
+      if(select.desc != "none"){
+      df.estimates$description[i] <- df.sign[df.sign$bins == id, select.desc]
+      } else {df.estimates$description[i] <- NA}
+      
+
+    }
+    # adjust pvalues
+    df.estimates$p.value.sex.age.PD.adj<-p.adjust(df.estimates$p.value.sex.age.PD, method = "fdr")
+    df.estimates$p.value.PD.adj<-p.adjust(df.estimates$p.value.PD, method = "fdr")
+    df.estimates$p.value.sex.adj<-p.adjust(df.estimates$p.value.sex, method = "fdr")
+    df.estimates$p.value.age.adj<-p.adjust(df.estimates$p.value.age, method = "fdr")
+
+  return(df.estimates)
+  
+}
+
+```
+
+# Run models
+## KOpath
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "description")
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
+```
+## KOmod
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules//RDS/all_no0_TSS_KOmod.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "description") 
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
+```
+
+## KO
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "Def") 
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
+```
+## Taxa
+```{r}
+kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "none") 
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
+```
+## GBM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "descr") 
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
+```
+## GMM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
+# select samples
+kop<-kop[,meta.all$SampleID]
+dim(kop)
+
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+
+# subset sign
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
+df.sign<-df.sign[order(df.sign$bins),]
+kop<-kop[order(rownames(kop)),]
+
+kop<-kop[df.sign$bins,]
+all(rownames(kop) == df.sign$bins)
+
+#log transf
+log_kop<-log(kop+min)
+log_kop_w<-as.data.frame(t(log_kop))
+
+# order samples
+meta.all<-meta.all[order(meta.all$SampleID),]
+log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
+stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
+
+df.estimates<-lm.conf(microbiome.feats = log_kop_w,
+                  metadata = meta.all,
+                  select.desc = "descr") 
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
+```
+
+# Summarise data
+```{r}
+df.perc<-data.frame(Microbiome.features = c("KO", "KO_mod", "KO_path", "GMM", "GBM", "mOTUs"),
+                    prop.conf = vector(length = 6))
+
+
+df.ko<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.ko, p.value.PD.adj < 0.05))
+df.ko$type <- rep("KO", nrow(df.ko))
+df.ko<-subset(subset(df.ko, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.ko)
+df.perc$prop.conf[1]<-round(a[1]/b[1]*100, digits = 1)
+
+df.km<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.km, p.value.PD.adj < 0.05))
+df.km$type <- rep("KO_mod", nrow(df.km))
+df.km<-subset(subset(df.km, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.km)
+df.perc$prop.conf[2]<-round(a[1]/b[1]*100, digits = 1)
+
+df.kp<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.kp, p.value.PD.adj < 0.05))
+df.kp$type <- rep("KO_path", nrow(df.kp))
+df.kp<-subset(subset(df.kp, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.kp)
+df.perc$prop.conf[3]<-round(a[1]/b[1]*100, digits = 1)
+
+df.gmm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.gmm, p.value.PD.adj < 0.05))
+df.gmm$type <- rep("GMM", nrow(df.gmm))
+df.gmm<-subset(subset(df.gmm, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.gmm)
+df.perc$prop.conf[4]<-round(a[1]/b[1]*100, digits = 1)
+
+
+df.gbm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.gbm, p.value.PD.adj < 0.05))
+df.gbm$type <- rep("GBM", nrow(df.gbm))
+df.gbm<-subset(subset(df.gbm, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.gbm)
+df.perc$prop.conf[5]<-round(a[1]/b[1]*100, digits = 1)
+
+df.tax<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
+#check sign for PD before cov
+b<-dim(subset(df.tax, p.value.PD.adj < 0.05))
+df.tax$type <- rep("mOTUs", nrow(df.tax))
+df.tax<-subset(subset(df.tax, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.05)
+a<-dim(df.tax)
+df.perc$prop.conf[6]<-round(a[1]/b[1]*100, digits = 1)
+
+
+
+
+# check, format, and save
+df.perc$pot.conf<-rep("Sex.Age", nrow(df.perc))
+df.perc
+saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.SexAge_bedarf.rds")
+
+
+df.conf.feat<-rbind.data.frame(df.ko, df.kp, df.km, df.gbm, df.gmm, df.tax)
+# select only the sign in lm.PD and not sign in lm.cov.pd
+df.conf.feat<-subset(subset(df.conf.feat, p.value.PD < 0.05), p.value.sex.age.PD.adj  >= 0.05)
+
+
+df.conf.form<-data.frame(Microbiome.feature = df.conf.feat$feats,
+                         p.value.sex.age.PD = df.conf.feat$p.value.sex.age.PD,
+                         p.value.sex.age.PD.adj = df.conf.feat$p.value.sex.age.PD.adj,
+                         est.sex.age.PD = df.conf.feat$est.sex.age.PD,
+                         p.value.PD = df.conf.feat$p.value.PD,
+                         p.value.PD.adj = df.conf.feat$p.value.PD.adj,
+                         est.PD = df.conf.feat$est.PD,
+                       
+                         p.value.sex = df.conf.feat$p.value.sex,
+                         p.value.sex.adj = df.conf.feat$p.value.sex.adj,
+                         est.sex = df.conf.feat$est.sex,
+                       
+                         p.value.age = df.conf.feat$p.value.age,
+                         p.value.age.adj = df.conf.feat$p.value.age.adj,
+                         est.age = df.conf.feat$est.age,
+                       
+                         description = df.conf.feat$description,
+                         type = df.conf.feat$type)
+write.table(df.conf.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = F, row.names = F, col.names = T, sep = "\t")
+
+```

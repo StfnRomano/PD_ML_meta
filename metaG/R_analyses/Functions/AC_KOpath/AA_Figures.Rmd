@@ -1,0 +1,69 @@
+---
+title: "KEGGapth figs"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, root.dir}
+library(ggplot2)
+library(dplyr)
+```
+
+#CSV
+```{r}
+perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Single_5per_log.rds")
+#take only 5%
+perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
+# format to merge with the other
+perf_log<-data.frame(
+  training.data = perf_sing_log$study,
+  testing.data  = perf_sing_log$study,
+  AUC = perf_sing_log$AUC,
+  ML = perf_sing_log$ML,
+  norm = perf_sing_log$norm
+)
+
+csv_log<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/metaG_CSV_5perc_Log_df_auc.rds")
+
+
+df_comb<-rbind.data.frame(perf_log, csv_log)
+
+
+df_comb$AUC<-as.numeric(df_comb$AUC)
+df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
+df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
+df.diag<-df_comb[1:42,]
+
+```
+
+
+# Tile plot
+```{r}
+ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
+  geom_tile(color = "black") +
+  geom_text(aes(label = AUC), color = "black", size = 4) +
+  geom_text(data = df.auc, mapping = aes(label = AUC), color = "white", size = 4) +
+  coord_fixed() +
+  scale_fill_viridis_c(option = "H",
+                       breaks=c(50,70,100),
+                       limits=c(40,100))+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
+        strip.text.x = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 12),
+        legend.position = "right") +
+  facet_wrap(~ ML)+
+  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
+  facet_wrap(~ ML)
+
+ggsave("/metaG/R_analyses/Functions/AC_KOpath/Figures/CSV_5log.svg",
+       width = 10, 
+       height = 8)
+
+
+```
+
+

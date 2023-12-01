@@ -1,0 +1,385 @@
+---
+title: "Medications_table"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+library("readxl")
+library("tidyverse")
+```
+
+
+```{r}
+load("metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
+```
+
+define function to refit the model with the right variables
+```{r}
+lm.refit.meds<-function(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = df.selection,
+                        select.desc = "descr"){
+    
+  df.estimates<-data.frame(feats = vector(length = ncol(microbiome.feats)),
+                   p.value.cov.PD = vector(length = ncol(microbiome.feats)),
+                   est.cov.PD = vector(length = ncol(microbiome.feats)),
+                   p.value.PD = vector(length = ncol(microbiome.feats)),
+                   est.PD =  vector(length = ncol(microbiome.feats)),
+                   est.conc = vector(length = ncol(microbiome.feats)),
+                   description =  vector(length = ncol(microbiome.feats)),
+                   variables = vector(length = ncol(microbiome.feats)))
+    
+    for(i in 1:nrow(df.selection)){
+      id<-df.selection$feats[i]
+      form<-df.selection$variables[i]
+      if(length(grep("PD", form)) == 0){
+        form<-paste0(form, " + PD")
+      }
+      print(paste0(i, " of ", nrow(df.selection)))
+      tmp<-microbiome.feats[,id]
+      stopifnot(all(rownames(tmp) == metadata$SampleID))
+      tmp<-cbind.data.frame(bins = tmp, metadata[,3:15])
+      mod<-lm(formula(paste0("bins ~  ", form)),
+               data = tmp, na.action = "na.exclude")
+      df.estimates$feats[i]<-id
+      df.estimates$p.value.cov.PD[i]<-broom::tidy(mod)$p.value[nrow(broom::tidy(mod))]
+      df.estimates$est.cov.PD[i]<-broom::tidy(mod)$estimate[nrow(broom::tidy(mod))]
+      df.estimates$variables[i]<-form
+      
+      mod<-lm(bins ~ PD, data = tmp, na.action = "na.exclude")
+    
+      df.estimates$p.value.PD[i]<-broom::tidy(mod)$p.value[nrow(broom::tidy(mod))]
+      df.estimates$est.PD[i]<-broom::tidy(mod)$estimate[nrow(broom::tidy(mod))]
+      
+      if(select.desc != "none"){
+      df.estimates$description[i] <- df.sign[df.sign$bins == id, select.desc]
+      } else {df.estimates$description[i] <- NA}
+      
+
+    
+    }
+    # adjust pvalues
+    df.estimates$p.value.cov.PD.adj<-p.adjust(df.estimates$p.value.cov.PD, method = "fdr")
+    df.estimates$p.value.PD.adj<-p.adjust(df.estimates$p.value.PD, method = "fdr")
+
+  return(df.estimates)
+  
+}
+
+
+```
+# GBM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GBM.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = gbm@df)
+  
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gbm_leaps_lmVSco.rds")
+```
+
+# GMM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GMM.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = gmm@df)
+
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gmm_leaps_lmVSco.rds")
+```
+
+
+# Tax
+```{r}
+kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = tax@df, 
+                        select.desc = "none")
+
+
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.taxa_leaps_lmVSco.rds")
+```
+
+# KO path
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = kopath@df, 
+                        select.desc = "description")
+
+
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_leaps_lmVSco.rds")
+```
+
+
+# KO mod
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules//RDS/all_no0_TSS_KOmod.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KOpath/RDS/df.sign.KOmod.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = komod@df, 
+                        select.desc = "description")
+
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_leaps_lmVSco.rds")
+```
+
+
+# KO
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
+
+df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
+                        metadata = m.w.m,
+                        df.selection = ko@df, 
+                        select.desc = "Def")
+
+
+saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_leaps_lmVSco.rds")
+```
+
+
+# make table
+```{r}
+
+df.perc<-data.frame(Microbiome.features = c("KO", "KO_mod", "KO_path", "GMM", "GBM", "mOTUs"),
+                    prop.conf = vector(length = 6))
+
+
+df.ko<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.ko, p.value.PD.adj < 0.05))
+df.ko$type <- rep("KO", nrow(df.ko))
+df.ko<-subset(subset(df.ko, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.ko)
+df.perc$prop.conf[1]<-round(a[1]/b[1]*100, digits = 1)
+
+df.km<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.km, p.value.PD.adj < 0.05))
+df.km$type <- rep("KO_mod", nrow(df.km))
+df.km<-subset(subset(df.km, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.km)
+df.perc$prop.conf[2]<-round(a[1]/b[1]*100, digits = 1)
+
+df.kp<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.kp, p.value.PD.adj < 0.05))
+df.kp$type <- rep("KO_path", nrow(df.kp))
+df.kp<-subset(subset(df.kp, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.kp)
+df.perc$prop.conf[3]<-round(a[1]/b[1]*100, digits = 1)
+
+df.gmm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gmm_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.gmm, p.value.PD.adj < 0.05))
+df.gmm$type <- rep("GMM", nrow(df.gmm))
+df.gmm<-subset(subset(df.gmm, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.gmm)
+df.perc$prop.conf[4]<-round(a[1]/b[1]*100, digits = 1)
+
+
+df.gbm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gbm_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.gbm, p.value.PD.adj < 0.05))
+df.gbm$type <- rep("GBM", nrow(df.gbm))
+df.gbm<-subset(subset(df.gbm, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.gbm)
+df.perc$prop.conf[5]<-round(a[1]/b[1]*100, digits = 1)
+
+df.tax<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.taxa_leaps_lmVSco.rds")
+#check sign for PD before cov
+b<-dim(subset(df.tax, p.value.PD.adj < 0.05))
+df.tax$type <- rep("mOTUs", nrow(df.tax))
+df.tax<-subset(subset(df.tax, p.value.PD.adj < 0.05), p.value.cov.PD.adj >= 0.05)
+a<-dim(df.tax)
+df.perc$prop.conf[6]<-round(a[1]/b[1]*100, digits = 1)
+
+
+
+
+# check, format, and save
+df.perc$pot.conf<-rep("non.PD.medications", nrow(df.perc))
+tmp<-readRDS(file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
+df.perc<-rbind.data.frame(df.perc, tmp)
+df.perc
+saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs_other.meds.rds")
+
+
+
+df.conf.feat<-rbind.data.frame(df.ko, df.kp, df.km, df.gbm, df.gmm, df.tax)
+# select only the sign in lm.PD and not sign in lm.cov.pd
+df.conf.feat<-subset(subset(df.conf.feat, p.value.PD < 0.05), p.value.cov.PD  >= 0.05)
+
+# format table
+df.conf.feat$description<-gsub("        ", "", df.conf.feat$description)
+
+df.conf.form<-data.frame(Microbiome.feature = df.conf.feat$feats,
+                         p.value.cov.PD = df.conf.feat$p.value.cov.PD,
+                         p.value.cov.PD.adj = df.conf.feat$p.value.cov.PD.adj,
+                         est.cov.PD = df.conf.feat$est.cov.PD,
+                         p.value.PD = df.conf.feat$p.value.PD,
+                         p.value.PD.adj = df.conf.feat$p.value.PD.adj,
+                         est.PD = df.conf.feat$est.PD,
+                         description = df.conf.feat$description,
+                         variables = df.conf.feat$variables,
+                         type = df.conf.feat$type)
+write.table(df.conf.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/Drugs.conf.tab_lmVScov_leaps.txt", quote = F, row.names = F, col.names = T, sep = "\t")
+
+```

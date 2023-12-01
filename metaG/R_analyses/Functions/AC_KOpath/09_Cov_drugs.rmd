@@ -1,0 +1,305 @@
+---
+title: "Medications"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Download metadata from here: https://zenodo.org/records/7246185
+
+```{r}
+library("readxl")
+library(tidyverse)
+library(leaps)
+set.seed(123)
+
+m.w <- read_excel("Source_Data_24Oct2022_Wallen.xlsx", sheet = "subject_metadata")
+names(m.w)
+
+```
+
+Select the medications
+```{r}
+vars<-c(1, 2, 37:52)
+m.w<-m.w[, vars]
+
+# select the meds that were taken by at least by 20% of the donors
+m.filt<-m.w %>%
+  pivot_longer(cols = Antibiotics_current:Antihistamines,
+              names_to = "meds",
+              values_to = "YN") %>%
+  group_by(meds, YN) %>%
+  summarise(n = n(),
+            aver = n/724) %>% # num samples 
+  filter(YN == "N" & aver < 0.80)
+m.filt  
+
+m.w.f<-m.w[,c("sample_name", "Case_status", m.filt$meds)]
+
+```
+
+Match ids with sample names
+```{r}
+meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta.w<-subset(meta, Study == "Wallen_2022")
+
+# join the two
+library(tidyverse)
+all(meta.w$Other %in% m.w.f$sample_name)
+dim(meta.w)
+m.w.m<-left_join(m.w.f, meta.w, by = c("sample_name" = "Other"))
+
+
+
+
+m.w.m$Anti_inflammatory_drugs <-as.factor(m.w.m$Anti_inflammatory_drugs)
+m.w.m$Antibiotics_past_3_months <-as.factor(m.w.m$Antibiotics_past_3_months)
+m.w.m$Antihistamines <-as.factor(m.w.m$Antihistamines)
+m.w.m$Blood_pressure_med <-as.factor(m.w.m$Blood_pressure_med)
+m.w.m$Blood_thinners <-as.factor(m.w.m$Blood_thinners)
+m.w.m$Cholesterol_med <-as.factor(m.w.m$Cholesterol_med)
+m.w.m$Depression_anxiety_mood_med <-as.factor(m.w.m$Depression_anxiety_mood_med)
+m.w.m$Indigestion_drugs <-as.factor(m.w.m$Indigestion_drugs)
+m.w.m$Laxatives <-as.factor(m.w.m$Laxatives)
+m.w.m$Pain_med <-as.factor(m.w.m$Pain_med)
+m.w.m$Thyroid_med <-as.factor(m.w.m$Thyroid_med)
+m.w.m$PD <-as.factor(m.w.m$PD)
+sapply(m.w.m, unique)
+```
+
+## define function for lm
+```{r}
+lm.medications <- function(microb.feats = log_kop,
+                           metadata = m.w.m){
+  # create df/list to return
+  df.selection<-data.frame(feats = vector(length = ncol(microb.feats)),
+              variables = vector(length = ncol(microb.feats)))
+
+  l.k.kp<-vector(length = ncol(microb.feats), mode = "list")
+
+  for(i in 1:ncol(microb.feats)){
+    print(paste0(i, " of ", length(microb.feats)))
+    tmp<-microb.feats[,i]
+    stopifnot(all(rownames(tmp) == metadata$SampleID))
+    tmp<-cbind.data.frame(bins = tmp, metadata[,c(3:13,15)])
+    l.k.kp[[i]]<-regsubsets(bins ~ ., data = tmp, nvmax = 12)
+    k<-summary(l.k.kp[[i]])
+    var<-k$which[which(k$cp == min(k$cp)),]
+    var<-which(var == TRUE)[-1] # select only included variable and remove intercept. They are ids of variables
+    n.var<-names(tmp)[c(1,var)]
+    
+    df.selection$feats[i]<-names(microb.feats)[i]
+    if(length(grep("PD",n.var)) == 1){
+      # remove bins from variables
+      df.selection$variables[i]<-paste(n.var[-1], collapse = " + ") # -1 to remove bins from the formula
+    } else {df.selection$variables[i]<-paste(c(n.var[-1], "PD"), collapse = " + ")}
+  }
+  setClass("lm.med.sel",representation(df="data.frame",l.k="list"))
+  data4<-new("lm.med.sel",df=df.selection,l.k=l.k.kp)
+}
+
+```
+Load data and sign data and make models
+
+## KO path
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+kopath<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+
+
+```
+
+## KO mod
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/all_no0_TSS_KOmod.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+
+komod<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+
+```
+
+## KO
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+
+ko<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+```
+
+## Taxa
+```{r}
+kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+
+tax<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+```
+
+## GMM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/AA_KO//RDS/GMM.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+
+gmm<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+```
+
+## GBM
+```{r}
+kop<-readRDS("metaG/R_analyses/Functions/KO/RDS/GBM.rds")
+# select samples
+dim(kop)
+kop<-kop[,meta.w$SampleID]
+dim(kop)
+
+# subset only the functions of interest
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
+kop<-kop[df.sign$bins,]
+dim(kop)
+all(rownames(kop) == df.sign$bins)
+
+
+# log adj
+min<-sort(as.vector(as.matrix(kop)))
+min<-min[min!=0]
+min<-min[1]/10
+log_kop<-log(kop+min)
+
+
+# order samples
+log_kop<-as.data.frame(t(log_kop))
+m.w.m<-m.w.m[order(m.w.m$SampleID),]
+log_kop<-log_kop[order(rownames(log_kop)),]
+stopifnot(all(m.w.m$SampleID == rownames(log_kop)))
+
+
+gbm<-lm.medications(microb.feats = log_kop,
+                           metadata = m.w.m)
+```
+# Save
+```{r}
+save.image("metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
+```
