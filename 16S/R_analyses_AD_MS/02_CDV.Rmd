@@ -1,0 +1,72 @@
+---
+title: "CDV"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr",  "BiocManager", "tidyverse")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+list.of.bioc <- c("phyloseq")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+library(phyloseq)
+library(tidyverse)
+library(SIAMCAT)
+
+
+# load my function to run siamcat
+source("/Scripts/Cross_study_validation.r")
+source("/Scripts/Siamcat_wf.r")
+
+set.seed(56987)
+```
+
+# Load data
+```{r}
+# load other PD ML models
+load("/16S/R_analyses/RData/16S_Sinlge_5perc_log.RData")
+# Load data from other diseases
+all.tss<-readRDS("/16S/01_16S_databases/AD_MS_GTDB2017/RDS/all_g_TSS.rds")
+g.ad<-rownames(all.tss)
+all.tss.store<-all.tss 
+meta<-readRDS("/16S/R_analyses_AD//RDS/meta_ad.rds")
+meta$PD<-as.character(meta$PD)
+# specify that not diseases are HC and other diseases are disease
+meta[meta$PD != "HC",]$PD<- "disease"
+
+```
+# Run CDV
+```{r}
+cdv_r5x10<-cross.study.validation(list.models = ridge_5x10,
+                                 microbiome = NULL,
+                                 meta = NULL,
+                                 names.studies = as.character(unique(meta$Study)),
+                                 label="PD", 
+                                 case="PD",
+                                 auc.plot = F,
+                                 name.study.var = "Study_2",
+                                 study.in.models = F,
+                                 meta.test.hold = meta,
+                                 microbiome.test.hold = all.tss,
+                                 name.study.var.hold = "Study",
+                                 label.hold = "PD",
+                                 case.hold = "HC", 
+                                 direction = "<",
+                                 is.model.list = TRUE)
+
+df_rdige<-cross.disease.pred(list.of.csv.models = cdv_r5x10, list.train.models =  ridge_5x10)
+df_rdige$prev<-rep("5% in 10", nrow(df_rdige))
+df_rdige$ML<-rep("ridge", nrow(df_rdige))
+saveRDS(df_rdige, "/16S/R_analyses_AD/RDS/CDV.rds")
+
+```

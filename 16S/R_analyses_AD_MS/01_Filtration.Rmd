@@ -1,0 +1,124 @@
+---
+title: "16S ADMS filt"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+list.of.packages <- c("dplyr", "vegan")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+if (!requireNamespace("BiocManager", quietly = TRUE)){
+    install.packages("BiocManager")}
+
+
+list.of.bioc <- c("phyloseq",  "microbiome", "ggpubr")
+new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
+if(length(new.packages)) BiocManager::install(new.packages)
+library(phyloseq)
+library(dplyr)
+library(microbiome)
+library(vegan)
+source("/Scripts/Pevalence_functions.r")
+d<-"/16S/R_analyses/RData/"
+dir.create(d, recursive = T)
+
+```
+
+# Load metadata + datasets
+```{r}
+meta<-readRDS( "/16S/R_analyses_AD/RDS/meta_ad.rds")
+all.g<-readRDS("/16S/AD_MS_GTDB/all.g_combined_NB_GTDB207.rds")
+```
+# Clen data
+## Concordance meta-data
+```{r}
+dim(meta)
+dim(all.g)
+setdiff(meta$SampleID,names(all.g))
+# are all samples in meta in the OTU table?
+meta<-meta[order(meta$SampleID),]
+all.g<-all.g[, order(names(all.g))]
+if((all(meta$SampleID == names(all.g)))){
+  print("All SampleID in meta are the same as in the Abund table")
+} else {stop("meta and Abund table do not have the same samples")}
+
+```
+# Clean the datasets
+remove taxa w 0 counts -> rows
+remove samples with 0 counts -> cols
+```{r}
+if(length(which(rowSums(all.g)==0)) > 0){
+  print("Removing taxa with 0 counts, most likely due to sample filtration")
+  message(paste0("There are ", length(which(rowSums(all.g)==0)), " taxa with 0 counts. removed!"))
+  all.g<-all.g[-1*which(rowSums(all.g)==0),]
+} else {print("No taxa with 0 counts")}
+
+if(length(all.g[, colSums(all.g)==0])  > 0){
+  print("Removing samples with 0 counts, most likely due to sample filtration")
+  message(paste0("There are ",length(which(colSums(all.g)==0)), " samples with 0 counts. removed!"))
+  all.g<-all.g[,-1*which(colSums(all.g)==0)]
+} else {print("No samples with 0 counts")}
+
+
+# correct the meta
+meta<-meta[meta$SampleID %in% names(all.g),]
+```
+
+Remove samples with less than 2000 reads
+```{r}
+colSums(all.g) -> cls.g
+
+df.g<-data.frame(samples = names(cls.g),
+                 depth = cls.g)
+
+
+
+all(meta$SampleID == names(all.g))
+df.g<-cbind.data.frame(df.g, meta)
+
+
+df.g<-df.g[order(df.g$depth),]
+head(df.g, n = 20)
+
+ids<-subset(df.g, depth >= 2000)$SampleID
+###############
+# Filter both datasets
+############
+
+all.g<-all.g[, ids]
+meta<-meta[meta$SampleID %in% ids,]
+meta<-meta[order(meta$SampleID),]
+all.g<-all.g[, order(names(all.g))]
+all(names(all.g) == meta$SampleID)
+```
+
+Now save the files
+```{r}
+print("Save a count table and a proportion table")
+all.g.count<-all.g
+all.g<-as.data.frame(prop.table(as.matrix(all.g.count), 2))
+
+all.g<-all.g[,order(names(all.g))]
+meta<-meta[order(meta$SampleID),]
+if(all(meta$SampleID == names(all.g)) & all(meta$SampleID == names(all.g.count))){
+  saveRDS(all.g.count, "/16S/AD_MS_GTDB/RDS/all_g_counts.rds")
+  saveRDS(all.g, "/16S/AD_MS_GTDB/RDS/all_g_TSS.rds")
+}
+
+
+# rename meta rows
+print("Sort the meta and convert to factor")
+rownames(meta)<-meta$SampleID
+meta$Study<-as.factor(meta$Study)
+meta$Study<-as.factor(meta$Study)
+meta$PD<-as.factor(meta$PD)
+
+saveRDS(meta, "/16S/R_analyses_AD/RDS/meta_ad.rds")
+
+```
+
