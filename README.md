@@ -1,7 +1,26 @@
 ## PD_ML_meta
 
+### Overview
 
-The structure of the repos is as follow:
+These scripts have been used to conduct the data-analysis in the publication:
+
+_Machine learning-based meta-analysis reveals gut microbiome alterations associated with Parkinson’s disease_
+Stefano Romano, Jakob Wirbel, Rebecca Ansorge, Christian Schudoma, Quinten Raymond Ducarmon, Arjan Narbad, Georg Zeller
+bioRxiv 2023.12.05.569565; doi: https://doi.org/10.1101/2023.12.05.569565 
+
+This code was tailored to the analyses conducted in the above manuscript, and it is not intended to be used in other contexts.
+The workflow consists of a series of numbered R scripts that need to be executed one after the other. 
+There are additional R scripts (e.g. AA_, AB_, AC_) that were used to create the final figures and tables.
+
+If you find this code useful or use any of the approaches below in your work, please cite:
+
+_Machine learning-based meta-analysis reveals gut microbiome alterations associated with Parkinson’s disease_
+Stefano Romano, Jakob Wirbel, Rebecca Ansorge, Christian Schudoma, Quinten Raymond Ducarmon, Arjan Narbad, Georg Zeller
+bioRxiv 2023.12.05.569565; doi: https://doi.org/10.1101/2023.12.05.569565 
+
+### Repository strucutre
+
+The structure of the repository is as follow:
 ```
 ├── 16S
 │   ├── R_analyses
@@ -116,6 +135,13 @@ The structure of the repos is as follow:
     ├── Pevalence_functions.r
     └── Siamcat_wf.r
 ```
+
+### Packages installation
+
+Installation of the R packages used in the analyses is reported in the respective R scripts. In general this has been done using either `install.packages('package_name')` or `BiocManager::install("package_name")`
+
+### Usage instruction
+
 The workflow for each profile is as follows:
 
    * filter the datasets
@@ -131,4 +157,8 @@ The workflow for each profile is as follows:
    * combine results in figures and tables
 
 Analyses for shot-gun metagenomes (metaG) were run first. This produced some intermediate files that were then used while processing 16S amplicon data for producing the final plots. ML models built in the KO data were run in two different scripts (03a, 03b; 05a, 05b) to accommodate memory restrictions during computation.
+
+### Package versions
+
+All data analyses were performed in R v_4.2. We used the following R packages: `omixerRpm v_0.3.3`, `phyloseq v_1.40`, `vegan v_2.6.4`, `genodds v_1.1.2`, `meta v_6.2.1`, `clusterProfiler V_4.4`, `leaps v_3.1`, `SIAMCAT v_2.0`, `stats v_4.2.3`, `rtk v_0.2.6.1`, `MMUPHin v_1.10.3`, `bapred v_1.1`, `nlme 3.1.162`.
 
