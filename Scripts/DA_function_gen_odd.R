@@ -1,6 +1,6 @@
 # This function runs genOdds for case control studies
 # It requires:
-# * a list of df containing the data. df in the list have to have row = sample names; col = species
+# * a list of df containing the data. df in the list have to have row = sample names; col = feats
 # * the meta data matching the samples in the list above. Need a variable called Cohort and one called Sample_ID
 
 calcualte_da_genOdds<-function( list.df,
