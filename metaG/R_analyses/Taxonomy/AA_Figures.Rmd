@@ -15,16 +15,16 @@ library(dplyr)
 
 ```{r}
 # clr
-s5<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
-s10<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_10per_log.rds")
-s20<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_20per_log.rds")
-s30<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_30per_log.rds")
+s5<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+s10<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_10per_log.rds")
+s20<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_20per_log.rds")
+s30<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_30per_log.rds")
 
 #clr
-s5c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_clr.rds")
-s10c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_10per_clr.rds")
-s20c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_20per_clr.rds")
-s30c<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_30per_clr.rds")
+s5c<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_clr.rds")
+s10c<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_10per_clr.rds")
+s20c<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_20per_clr.rds")
+s30c<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_30per_clr.rds")
 s30c$prev<-rep("30% in 2 std", nrow(s30c))
 ```
 
@@ -63,9 +63,15 @@ g<-ggplot(df, aes(prev, AUC, fill=norm)) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90)) +
   scale_fill_manual(values = c("#A669EE", "#CC79A7")) +
-  xlab("Prevalence filtration")
+  xlab("Feature filtrations") +
+  labs(fill = "Normalization")+
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        strip.text = element_text(size = 9.5))
 g
-ggsave(filename = "//metaG/R_analyses/Taxonomy/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
+ggsave(filename = "/metaG/R_analyses/Taxonomy/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
 
 ```
 
@@ -106,13 +112,17 @@ r<-ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
         legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
-  facet_wrap(~ ML)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data")
 
 r
 ggsave(plot = r, filename = "/metaG/R_analyses/Taxonomy/Figures/CSV_5perc_log.jpeg", 
@@ -121,5 +131,147 @@ ggsave(plot = r, filename = "/metaG/R_analyses/Taxonomy/Figures/CSV_5perc_log.jp
        height = 8)
 
 ```
+# Check effect of metadata on AUCs
+```{r}
+df_comb<-subset(df_comb,ML == "ridge")
+est<-c("Jo_2022", "Mao_2021", "Qian_2020")
+west<-c("Bedarf_2017", "Boktor_2_2023", "Boktor_1_2023", "Wallen_2022")
+
+# add west east
+df_comb$train <-ifelse(df_comb$training.data %in% west, "W", "E")
+df_comb$test <-ifelse(df_comb$testing.data %in% west, "W", "E")
+df_comb$schema<-paste0(df_comb$train, "_", df_comb$test)
+df_comb$val<-ifelse(df_comb$training.data == df_comb$testing.data, "CV", "CSV")
+saveRDS(df_comb, "/metaG/R_analyses/Taxonomy/RDS/df_comb.rds")
+
+###############################################################################
+# test effect of east west
+################################################################################
+
+anova(aov(AUC ~ schema, data = subset(df_comb, val == "CSV")))
+model <- aov(AUC ~ schema, data = subset(df_comb, val == "CSV"))
+(tukey_result <- TukeyHSD(model))
+
+# load age and gender
+age<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.diff.age.rds")
+# remove the NA
+age<-na.omit(age)
+gen<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.diff.gender.rds")
+
+# remove the NA and do another ratio
+gen<-na.omit(gen) %>%
+  group_by(Study) %>%
+  mutate(delta.delta = lag(delta.winCases)/delta.winCases) %>%
+  na.omit(gen)
+  
+
+df.comb.ag<-rbind.data.frame(
+  age %>%
+    select(Study, delta) %>%
+    right_join(df_comb, by = c("Study" = "training.data" )) %>%
+    mutate(factor = "age",
+           tt = "train") %>%
+    select(-testing.data),
+  gen %>%
+    select(Study, delta.delta) %>%
+    dplyr::rename(delta=delta.delta) %>%
+    right_join(df_comb, by = c("Study" = "training.data" )) %>%
+    mutate(factor = "sex",
+           tt = "train")%>%
+    select(-testing.data),
+  age %>%
+    select(Study, delta) %>%
+    right_join(df_comb, by = c("Study" = "testing.data" )) %>%
+    mutate(factor = "age",
+           tt = "test")%>%
+    select(-training.data),
+  gen %>%
+    select(Study, delta.delta) %>%
+    dplyr::rename(delta = delta.delta) %>%
+    right_join(df_comb, by = c("Study" = "testing.data" )) %>%
+    mutate(factor = "sex",
+           tt = "test")%>%
+        select(-training.data))
+saveRDS(df.comb.ag, "/metaG/R_analyses/Taxonomy/RDS/df.comb.ag.rds")
 
 
+##################################################################
+## test associations between pop feats and AUCs 
+###################################################################
+
+# lm for gender train CSV
+tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "sex")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CSV SMG and train data is ", summary(mod)$r.squared)
+r2.gender.smg.csv.train<-summary(mod)$r.squared
+
+
+# lm for gender test CSV
+tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "sex")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CSV SMG and test data is ", summary(mod)$r.squared)
+r2.gender.smg.csv.test<-summary(mod)$r.squared
+
+
+# lm for age train CSV
+tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CSV SMG and train data is ", summary(mod)$r.squared)
+r2.age.smg.csv.train<-summary(mod)$r.squared
+
+
+# lm for Age test CSV
+tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CSV SMG and test data is ", summary(mod)$r.squared)
+r2.age.smg.csv.test<-summary(mod)$r.squared
+
+
+# lm for gender  CV
+tmp<-subset(df.comb.ag, val == "CV" & factor == "sex")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CV SMG is ", summary(mod)$r.squared)
+r2.gender.smg.cv<-summary(mod)$r.squared
+
+
+# lm for Age  CSV
+tmp<-subset(df.comb.ag,  val == "CV" & factor == "age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CV SMG is ", summary(mod)$r.squared)
+r2.age.smg.cv<-summary(mod)$r.squared
+
+
+
+# lm E/W CSV [here there are duplicate that need to be removed]
+tmp<-subset(df_comb, val == "CSV") 
+mod<-lm(AUC~schema, data = tmp)
+summary(aov(mod))
+message("The variance explained by W/E comb in CSV 16S is ", summary(mod)$r.squared)
+r2.ew.smg.csv<-summary(mod)$r.squared
+# NS
+
+# lm E/W CV [here there are duplicate that need to be removed]
+tmp<-subset(df_comb, val == "CV") 
+mod<-lm(AUC~schema, data = tmp)
+summary(aov(mod))
+message("The variance explained by W/E comb in CV 16S is ", summary(mod)$r.squared)
+r2.ew.smg.cv<-summary(mod)$r.squared
+
+
+df.smg<-data.frame(r2 = c(r2.gender.smg.csv.train, r2.gender.smg.csv.test, 
+                          r2.age.smg.csv.train, r2.age.smg.csv.test, 
+                          r2.gender.smg.cv, r2.age.smg.cv, r2.ew.smg.csv,
+                          r2.ew.smg.cv),
+                   validation = c(rep("CSV", 4), rep("CV", 2), "CSV", "CV"),
+                   train.test = c("train", "test", "train", "test", NA, NA, NA, NA),
+                   factor = c("Gender", "Gender", "Age", "Age", "Gender", "Age", "E/W", "E/W"),
+                   seqs = rep("SMG", 8))
+
+saveRDS(df.smg, "/metaG/R_analyses/Taxonomy/RDS/rsq.age.sex.rds")
+```

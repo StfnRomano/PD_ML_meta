@@ -8,7 +8,10 @@ editor_options:
 
 ```{r}
 library(ggplot2)
-library(dplyr)
+library(tidyverse)
+library(emmeans)
+library(nlme)
+
 ```
 
 # Seq depth
@@ -36,7 +39,7 @@ meta$Study_2[meta$Study_2 == "Lubomski"]<-"Lubomski_2022"
 meta$Study_2[meta$Study_2 == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
 meta$Study_2[meta$Study_2 == "Qian"]<-"Qian_2018"
 meta$Study_2[meta$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
-meta$PD[meta$PD == "HC"]<-"CTRL"
+meta$PD[meta$PD == "HC"]<-"CTR"
 
 
 
@@ -86,23 +89,23 @@ length(readRDS("/16S/R_analyses/RDS/spec_30x10.rds"))
 
 # rename
 
-s5$prev<-rep("5% in 10 studies (214 feat.)", length = nrow(s5))
-s10$prev<-rep("10% in 10 studies (155 feat.)", length = nrow(s10))
-s20$prev<-rep("20% in 10 studies (110 feat.)", length = nrow(s20))
-s30$prev<-rep("30% in 10 studies (86 feat.)", length = nrow(s30))
+s5$prev<-rep("5% in 10 studies (212 feat.)", length = nrow(s5))
+s10$prev<-rep("10% in 10 studies (154 feat.)", length = nrow(s10))
+s20$prev<-rep("20% in 10 studies (109 feat.)", length = nrow(s20))
+s30$prev<-rep("30% in 10 studies (85 feat.)", length = nrow(s30))
 
-s5c$prev<-rep("5% in 10 studies (214 feat.)", length = nrow(s5c))
-s10c$prev<-rep("10% in 10 studies (155 feat.)", length = nrow(s10c))
-s20c$prev<-rep("20% in 10 studies (110 feat.)", length = nrow(s20c))
-s30c$prev<-rep("30% in 10 studies (86 feat.)", length = nrow(s30c))
+s5c$prev<-rep("5% in 10 studies (212 feat.)", length = nrow(s5c))
+s10c$prev<-rep("10% in 10 studies (154 feat.)", length = nrow(s10c))
+s20c$prev<-rep("20% in 10 studies (109 feat.)", length = nrow(s20c))
+s30c$prev<-rep("30% in 10 studies (85 feat.)", length = nrow(s30c))
 
 
 df<-rbind.data.frame(s5, s10, s20, s30, s5c, s10c, s20c, s30c)
 df$prev<-factor(df$prev,
-                levels = c("5% in 10 studies (214 feat.)", 
-                           "10% in 10 studies (155 feat.)", 
-                           "20% in 10 studies (110 feat.)", 
-                           "30% in 10 studies (86 feat.)"))
+                levels = c("5% in 10 studies (212 feat.)", 
+                           "10% in 10 studies (154 feat.)", 
+                           "20% in 10 studies (109 feat.)", 
+                           "30% in 10 studies (85 feat.)"))
 
 
 (g<-ggplot(df, aes(prev, AUC, fill=norm)) +
@@ -113,10 +116,18 @@ df$prev<-factor(df$prev,
                                    hjust=0.95,
                                    vjust=0.2)) +
   scale_fill_manual(values = c("#A669EE", "#CC79A7")) +
-  xlab("Prevalence filtration")+
-  labs(fill = "Normalization"))
+  xlab("Feature filtrations")+
+  labs(fill = "Normalization")+
+  theme(axis.text = element_text(size = 10),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        strip.text = element_text(size = 9.5)))
 
-ggsave(filename = "/16S/R_analyses/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
+ggsave(filename = "~/Documents/EMBL_ML_PD/16S/R_analyses/Figures/AUC_PrevMLnorm.jpg", 
+ 	plot = g, 
+ 	device = "jpg", 
+ 	width = 8.5, height = 6)
 
 ```
 
@@ -158,13 +169,22 @@ df.diag<-df_comb[1:102,]
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 12)) +
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
+        legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2))
-
-ggsave(plot = r, filename = "/16S/R_analyses//Figures/CSV_5perc_log.jpeg", device = "jpeg", width = 21, height = 12)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data"))
+  
+ggsave(plot = r, filename = "/16S/R_analyses//Figures/CSV_5perc_log.jpeg", 
+	device = "jpeg", 
+	width = 21, 
+	height = 12)
 
 ```
 
@@ -198,6 +218,10 @@ lapply(l_df.rar, function(x) x %>%
                    average_rar = mean(rar),
                    stdev_rar = sd(rar)))
 
+tmp<-df.rar2 %>%
+  group_by(ML) %>%
+  summarise(cor = cor.test(not_rar, rar, use = "all.obs")$estimate,
+            pvalue = cor.test(not_rar, rar, use = "all.obs")$p.value)
 
 g<-ggplot(df.rar2, aes(not_rar, rar)) +
   geom_point(size = 4, pch = 21,  stroke = 1, alpha = 0.6) +
@@ -205,22 +229,18 @@ g<-ggplot(df.rar2, aes(not_rar, rar)) +
   facet_wrap(~ML) +
   theme_bw() +
   xlab("Not rarefied") +
-  ylab("Rarefied")
-g
-ggsave(filename = "/16S/R_analyses/Figures/Rarefied_vs_notRarefied.svg", width = 8, height = 4)
+  ylab("Rarefied") +
+  geom_text(data = tmp,
+            aes(label = paste(" Correlation coefficient: ", 
+                              round(cor, 1),
+                              "\n",
+                              "log10(p-value): ", 
+                              round(log10(pvalue),1))), 
+            x = 0.25, y = 0.78, hjust = 0, vjust = 0, size = 4)
 
-
-df.rar<-rbind.data.frame(rar2, csv)                       
-df.rar$AUC<-as.numeric(df.rar$AUC)
-g<-ggplot(df.rar, aes(rar, AUC)) +
-  geom_boxplot() +
-  facet_wrap(~ML) +
-  xlab("") +
-  ylab("AUC") +
-  theme_bw()
-g
-ggsave(filename = "/16S/R_analyses//Figures/BoxPlor_Rarefied_vs_notRarefied.svg", width = 8, height = 4)
-
+ggsave(filename = "/16S/R_analyses/Figures/Rarefied_vs_notRarefied.svg", 
+	width = 10, 
+	height = 6)
 ```
 
 # Comopare batch corections
@@ -258,14 +278,518 @@ g<-ggplot(perf, aes(batch, AUC)) +
 g
 
 
-ggsave(filename = "/16S/R_analyses/Figures/Batch_correction.svg", width = 8, height = 4)
+ggsave(filename = "/16S/R_analyses/Figures/Batch_correction.jpeg", 
+	width = 8, 
+	height = 4)
 
 # test sign of differences
+# ranodm effect
+l.perf<-split(perf, as.factor(perf$ML))
 
-perf %>%
-  group_by(ML) %>%
-  summarise(anova.pvalue = anova(aov(as.numeric(AUC)~batch))$`Pr(>F)`[1])
+l.aov<-l.perf
+for(i in 1:length(l.perf)){
+  print(unique(l.perf[[i]]$ML))
+  print(summary(nlme::lme(AUC~batch, data = l.perf[[i]], random = ~ 1 | comb)))
+  l.aov[[i]]<-nlme::lme(AUC~batch, data = l.perf[[i]], random = ~ 1 | comb)
+}  
+
+l.t1<-l.aov
+for(i in 1:length(l.aov)){
+  print(names(l.aov)[i])
+  x <-emmeans::emmeans(l.aov[[i]], pairwise ~ batch, adjust = "fdr")
+  l.t1[[i]]<-x$contrasts %>% as.data.frame()
+} 
+
+df.t<-do.call(rbind, l.t1)
+df.t$ML.method<-c(rep("ENET", nrow(df.t)/6),
+                  rep("LASSO", nrow(df.t)/6), 
+                  rep("LASSO-LibLinear", nrow(df.t)/6),
+                  rep("Random Forest", nrow(df.t)/6),
+                  rep("Ridge regression", nrow(df.t)/6),
+                  rep("Ridge-LibLinear", nrow(df.t)/6))
+# save table
+write.table(x = df.t,
+            file = "/16S/R_analyses/RDS/LMM.Batch.txt",
+            col.names = T,
+            row.names = F,
+            quote = F,
+            sep = "\t")
+
+```
+See effect of metadata of cv/csv aucs
+```{r}
+meta %>%
+  group_by(Study_2, Continent) %>%
+  distinct(Study_2, .keep_all = F)
+df_comb<-subset(df_comb, ML == "ridge")
+est<-c("Zhang", "Nishiwaki", "Tan", "Jo", "Qian")
+west<-c("Petrov", "Keshavarzian", "Hopfner", "Aho", "Weis", "Cirstea", "Kenna", "Wallen251", "Wallen151", "Lubomski", "Heintz_Bushart", "Pietrucci")
+
+# add west east
+df_comb$train <-ifelse(df_comb$training.data %in% west, "W", "E")
+df_comb$test <-ifelse(df_comb$testing.data %in% west, "W", "E")
+df_comb$schema<-paste0(df_comb$train, "_", df_comb$test)
+df_comb$val<-ifelse(df_comb$training.data == df_comb$testing.data, "CV", "CSV")
+
+# load age and gender
+age<-readRDS("/16S/R_analyses/RDS/meta.diff.age.rds")
+head(age)
+# remove the NA
+age<-na.omit(age)
+head(age)
+
+gen<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/meta.diff.gender.rds")
+head(gen)
+# remove the NA and do another ratio
+gen<-na.omit(gen) %>%
+  group_by(Study_2) %>%
+  mutate(delta.delta = lag(delta.winCases)/delta.winCases) %>%
+  na.omit(gen)
+
+
   
+
+df.comb.ag<-rbind.data.frame(
+  age %>%
+    select(Study_2, delta) %>%
+    right_join(df_comb, by = c("Study_2" = "training.data" )) %>%
+    mutate(factor = "Age",
+           tt = "train") %>%
+    select(-testing.data),
+  gen %>%
+    select(Study_2, delta.delta) %>%
+    dplyr::rename(delta=delta.delta) %>%
+    right_join(df_comb, by = c("Study_2" = "training.data" )) %>%
+    mutate(factor = "Gender",
+           tt = "train")%>%
+    select(-testing.data),
+  age %>%
+    select(Study_2, delta) %>%
+    right_join(df_comb, by = c("Study_2" = "testing.data" )) %>%
+    mutate(factor = "Age",
+           tt = "test")%>%
+    select(-training.data),
+  gen %>%
+    select(Study_2, delta.delta) %>%
+    dplyr::rename(delta = delta.delta) %>%
+    right_join(df_comb, by = c("Study_2" = "testing.data" )) %>%
+    mutate(factor = "Gender",
+           tt = "test")%>%
+        select(-training.data))
+
+##################################################################
+## test associations between pop characterisitcs and AUCs 
+###################################################################
+# lm for gender train CSV
+tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "Gender")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CSV 16S and train data is ", summary(mod)$r.squared)
+r2.gender.16S.csv.train<-summary(mod)$r.squared
+
+# lm for gender test CSV
+tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "Gender")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CSV 16S and test data is ", summary(mod)$r.squared)
+r2.gender.16S.csv.test<-summary(mod)$r.squared
+
+# lm for age train CSV
+tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "Age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CSV 16S and train data is ", summary(mod)$r.squared)
+r2.age.16S.csv.train<-summary(mod)$r.squared
+
+# lm for Age test CSV
+tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "Age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CSV 16S and test data is ", summary(mod)$r.squared)
+r2.age.16S.csv.test<-summary(mod)$r.squared
+
+# lm for gender train CV
+tmp<-subset(df.comb.ag, tt == "train" & val == "CV" & factor == "Gender")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Gender in CV 16S is ", summary(mod)$r.squared)
+r2.gender.16S.cv<-summary(mod)$r.squared
+
+# lm for Age test CSV
+tmp<-subset(df.comb.ag, tt == "test" & val == "CV" & factor == "Age")
+mod<-lm(AUC~delta, data = tmp)
+summary(mod)
+message("The variance explained by Age in CV 16S is ", summary(mod)$r.squared)
+r2.age.16S.cv<-summary(mod)$r.squared
+
+# lm E/W CSV [here there are duplicate that need to be removed]
+tmp<-subset(df_comb, val == "CSV") 
+mod<-lm(AUC~schema, data = tmp)
+summary(aov(mod))
+message("The variance explained by W/E comb in CSV 16S is ", summary(mod)$r.squared)
+r2.ew.16S.csv<-summary(mod)$r.squared
+
+# lm E/W CV [here there are duplicate that need to be removed]
+tmp<-subset(df_comb, val == "CV") 
+mod<-lm(AUC~schema, data = tmp)
+summary(aov(mod))
+message("The variance explained by W/E comb in CV 16S is ", summary(mod)$r.squared)
+r2.ew.16S.cv<-summary(mod)$r.squared
+
+df.16S<-data.frame(r2 = c(r2.gender.16S.csv.train, r2.gender.16S.csv.test, 
+                          r2.age.16S.csv.train, r2.age.16S.csv.test, 
+                          r2.gender.16S.cv, r2.age.16S.cv, r2.ew.16S.csv,
+                          r2.ew.16S.cv),
+                   validation = c(rep("CSV", 4), rep("CV", 2), "CSV", "CV"),
+                   train.test = c("train", "test", "train", "test", NA, NA, NA, NA),
+                   factor = c("Gender", "Gender", "Age", "Age", "Gender", "Age", "E/W", "E/W"),
+                   seqs = rep("16S", 8))
+
+
+###############################################################################
+# test effect of east west
+################################################################################
+
+anova(aov(AUC ~ schema, data = subset(df_comb, val == "CSV")))
+model <- aov(AUC ~ schema, data = subset(df_comb, val == "CSV"))
+(tukey_result <- TukeyHSD(model))
+
+####################################################################
+# Make figs for 16S
+####################################################################
+(gg<-subset(df.comb.ag, val != "CV" & factor == "Age") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+    geom_point(pch = 21, 
+               size = 4, 
+               alpha = 0.7, 
+               position = position_dodge(width = 0.3)) +
+    scale_fill_manual(values = c("#185ED8", "lightgray")) +
+    xlab("Average age ratio between CTR and PD") +
+    labs(fill = "Validation\nstrategy") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          strip.text = element_text(size = 12)) +
+    geom_smooth(color = "darkgray",
+                method = "lm",
+                show.legend = FALSE) +
+    facet_grid(tt~factor) +
+   scale_x_continuous(limits = c(0.7, 1.05)))
+
+(gt<-subset(df.comb.ag, val == "CV" & factor == "Age") %>%
+ggplot(aes(delta, AUC, fill = val)) +
+    geom_point(pch = 21, 
+               size = 4, 
+               alpha = 0.7, 
+               position = position_dodge(width = 0.3)) +
+  scale_fill_manual(values = c("lightgray")) +
+  xlab("") +
+  labs(fill = "Validation\nstrategy") +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        strip.text = element_text(size = 12),
+        legend.position = c(0.8,0.3)) +
+  geom_smooth(color = "darkgray",
+              method = "lm", 
+              show.legend = FALSE) +
+  facet_grid(~factor, scales = "free_x")+
+   scale_x_continuous(limits = c(0.7, 1.05))) 
+
+
+(cp1<-ggpubr::ggarrange(gt, gg, 
+                        common.legend = F))
+
+(ggg<-subset(df.comb.ag, val != "CV" & factor == "Gender") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+      geom_point(pch = 21, 
+                 size = 4, 
+                 alpha = 0.7, 
+                 position = position_dodge(width = 0.3)) +
+    scale_fill_manual(values = c("#185ED8", "lightgray")) +
+    xlab("Ratio of F/M between CTR and PD") +
+    labs(fill = "Validation\nstrategy") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          strip.text = element_text(size = 12)) +
+    geom_smooth(color = "darkgray",
+                method = "lm", 
+                show.legend = FALSE) +
+    facet_grid(tt~factor, scales = "free_x")) 
+
+(gtg<-subset(df.comb.ag, val == "CV" & factor == "Gender") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+      geom_point(pch = 21, 
+                 size = 4, 
+                 alpha = 0.7, 
+                 position = position_dodge(width = 0.3)) +
+      scale_fill_manual(values = c("lightgray")) +
+      xlab("") +
+      labs(fill = "Validation\nstrategy") +
+      theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14),
+            strip.text = element_text(size = 12),
+            legend.position = c(0.8,0.3),
+            legend.background = element_blank()) +
+      geom_smooth(color = "darkgray",
+                  method = "lm", 
+                  show.legend = FALSE) +
+      facet_grid(~factor, scales = "free_x")) 
+
+
+(cp2<-ggpubr::ggarrange(gtg, ggg, 
+                        common.legend = F))
+
+(bp<-ggplot(df_comb) +
+  geom_boxplot(mapping = aes(schema, AUC),
+               outlier.colour = NA) +
+   theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        strip.text = element_text(size = 12)) +
+  ylim(c(40, 85)) +
+  xlab("Comparison schema [train_test]") +
+  facet_grid(~val, scales = "free",space = "free_x"))
+
+
+df.16S$factor<-factor(df.16S$factor, levels = c("Age", "Gender", "E/W"))
+df.16S$r210<-df.16S$r2*100
+
+# csv
+brek<-c(0, 0.5^2, 1^2, 1.5^2)
+(csv16<-subset(df.16S, validation == "CSV") %>% 
+  ggplot(aes(factor, sqrt(r210), fill = train.test)) +
+    geom_bar(stat = "identity", position = position_dodge2(preserve = "single", padding = 0), 
+           width = 0.5) +
+    facet_grid(~validation, space = "free_x") +
+    xlab("Factor") +
+    ylab(expression(R^2)) +
+    theme_bw() +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          panel.grid = element_blank(),
+          legend.text = element_text(size = 10),
+          legend.position = c(0.2,0.85)) +
+    scale_fill_manual(values = c("#185ED8", "#5583D4")) +
+    labs(fill = "Train/Test set") +
+    scale_y_continuous(labels  = brek))
+
+# cv
+brek<-c(0, 1^2, 2^2, 3^2)
+(cv16<-subset(df.16S, validation == "CV") %>% 
+  ggplot(aes(factor, sqrt(r210), fill = train.test)) +
+    geom_bar(stat = "identity", position = position_dodge2(preserve = "single", padding = 0), 
+           width = 0.5) +
+    facet_grid(~validation, space = "free_x") +
+    xlab("Factor") +
+    ylab(expression(R^2)) +
+    theme_bw() +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          panel.grid = element_blank(),
+          legend.text = element_text(size = 10),
+          legend.position = "none",
+          axis.title.y = element_blank()) +
+    scale_fill_manual(values = c("#185ED8", "#5583D4")) +
+    labs(fill = "Train/Test set") +
+    scale_y_continuous(labels = brek))
+
+(ve<-ggpubr::ggarrange(csv16, cv16,
+                  ncol = 2, 
+                  common.legend = F))
+
+
+(gg16S<-ggpubr::ggarrange(cp1, cp2, bp, ve,
+                  ncol = 4, 
+                  widths = c(2,2,2,2),
+                  labels = "auto",
+                  common.legend = T))
+
+########################################################################################
+# make figs for smg
+########################################################################################
+df.comb.ag.smg<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.comb.ag.rds")
+df_comb.sgm<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df_comb.rds")
+
+(gg<-subset(df.comb.ag.smg, val != "CV" & factor == "age") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+    geom_point(pch = 21, 
+               size = 4, 
+               alpha = 0.7, 
+               position = position_dodge(width = 0.3)) +
+    scale_fill_manual(values = c("#185ED8", "lightgray")) +
+      xlab("Average age ratio between CTR and PD") +
+    labs(fill = "Validation\nstrategy") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          strip.text = element_text(size = 12)) +
+    geom_smooth(color = "darkgray",
+                method = "lm", 
+                show.legend = FALSE) +
+    facet_grid(tt~factor, scales = "free_x",
+                labeller = labeller(factor = c("age" = "Age")))+
+   scale_x_continuous(limits = c(0.9, 1.05))) 
+
+
+(gt<-subset(df.comb.ag.smg, val == "CV" & factor == "age") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+      geom_point(pch = 21, 
+                 size = 4, 
+                 alpha = 0.7, 
+                 position = position_dodge(width = 0.3)) +
+      scale_fill_manual(values = c("lightgray")) +
+      xlab("") +
+      labs(fill = "Validation\nstrategy") +
+      theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14),
+            strip.text = element_text(size = 12),
+            legend.position = c(0.2,0.3),
+            legend.background = element_blank()) +
+      geom_smooth(color = "darkgray",
+                  method = "lm", 
+                  show.legend = FALSE) +
+    facet_grid(~factor, scales = "free_x",
+                  labeller = labeller(factor = c("age" = "Age")))+
+       scale_x_continuous(limits = c(0.9, 1.05)))  
+
+(cp1<-ggpubr::ggarrange(gt, gg, 
+                        common.legend = F))
+
+(ggg<-subset(df.comb.ag.smg, val != "CV" & factor == "sex") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+      geom_point(pch = 21, 
+                 size = 4, 
+                 alpha = 0.7, 
+                 position = position_dodge(width = 0.3)) +
+      scale_fill_manual(values = c("#185ED8", "lightgray")) +
+      xlab("Ratio of F/M between CTR and PD") +
+      labs(fill = "Validation\nstrategy") +
+      theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14),
+            strip.text = element_text(size = 12)) +
+      geom_smooth(color = "darkgray",
+                  method = "lm", 
+                  show.legend = FALSE) +
+    facet_grid(tt~factor, scales = "free_x",
+                  labeller = labeller(factor = c("sex" = "Gender")))) 
+
+(gtg<-subset(df.comb.ag.smg, val == "CV" & factor == "sex") %>%
+  ggplot(aes(delta, AUC, fill = val)) +
+      geom_point(pch = 21, 
+                 size = 4, 
+                 alpha = 0.7, 
+                 position = position_dodge(width = 0.3)) +
+      scale_fill_manual(values = c("lightgray")) +
+      xlab("") +
+      labs(fill = "Validation\nstrategy") +
+      theme_bw() +
+      theme(panel.grid = element_blank(),
+            axis.text = element_text(size = 12),
+            axis.title = element_text(size = 14),
+            strip.text = element_text(size = 12),
+            legend.position = c(0.3,0.2),
+            legend.background = element_blank()) +
+      geom_smooth(color = "darkgray",
+                  method = "lm", 
+                  show.legend = FALSE) +
+      facet_grid(~factor, scales = "free_x",
+                  labeller = labeller(factor = c("sex" = "Gender")))) 
+
+(cp2<-ggpubr::ggarrange(gtg, ggg, 
+                        common.legend = F))
+
+(bp<-ggplot(df_comb.sgm) +
+  geom_boxplot(mapping = aes(schema, AUC),
+               outlier.colour = NA) +
+   theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        strip.text = element_text(size = 12)) +
+  ylim(c(40, 85)) +
+  xlab("Comparison schema [train_test]") +
+  facet_grid(~val, scales = "free",space = "free_x"))
+
+df.smg<-readRDS("/metaG/R_analyses/Taxonomy/RDS/rsq.age.sex.rds")
+
+df.smg$factor<-factor(df.smg$factor, levels = c("Age", "Gender", "E/W"))
+df.smg$r210<-df.smg$r2*100
+
+# csv
+brek<-c(0, 1^2, 2^2, 3^2, 4^2)
+(csvsmg<-subset(df.smg, validation == "CSV") %>% 
+  ggplot(aes(factor, sqrt(r210), fill = train.test)) +
+    geom_bar(stat = "identity", position = position_dodge2(preserve = "single", padding = 0), 
+           width = 0.5) +
+    facet_grid(~validation, space = "free_x") +
+    xlab("Factor") +
+    ylab(expression(R^2)) +
+    theme_bw() +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          panel.grid = element_blank(),
+          legend.text = element_text(size = 10),
+          legend.position = c(0.2,0.85)) +
+    scale_fill_manual(values = c("#185ED8", "#5583D4")) +
+    labs(fill = "Train/Test set") +
+    scale_y_continuous(labels  = brek))
+
+# cv
+(cvsmg<-subset(df.smg, validation == "CV") %>% 
+  ggplot(aes(factor, sqrt(r210), fill = train.test)) +
+    geom_bar(stat = "identity", position = position_dodge2(preserve = "single", padding = 0), 
+           width = 0.5) +
+    facet_grid(~validation, space = "free_x") +
+    xlab("Factor") +
+    ylab(expression(R^2)) +
+    theme_bw() +
+    theme(axis.text = element_text(size = 12),
+          axis.title = element_text(size = 14),
+          panel.grid = element_blank(),
+          legend.text = element_text(size = 10),
+          legend.position = "none",
+          axis.title.y = element_blank()) +
+    scale_fill_manual(values = c("#185ED8", "#5583D4")) +
+    labs(fill = "Train/Test set") +
+    scale_y_continuous(labels = brek))
+
+(ve<-ggpubr::ggarrange(csvsmg, cvsmg,
+                  ncol = 2, 
+                  common.legend = F))
+
+
+(ggSMG<-ggpubr::ggarrange(cp1, cp2, bp, ve,
+                  ncol = 4, 
+                  widths = c(2,2,2,2),
+                  labels = c("e", "f", "g", "h"),
+                  common.legend = T))
+
+ggpubr::ggarrange(gg16S, ggSMG, 
+                  ncol = 1) 
+ggsave(file = "/16S/R_analyses/Figures/Age.gender.tt.16S.SMG.svg",
+        width = 24, height = 8)
+#this fig was edited manually afterwards
 ```
 
-
+# Overall averages
+```{r}
+smg<-subset(df_comb.sgm, val == "CSV")
+s16<-subset(df_comb16, val == "CSV")
+mean(c(smg$AUC %>% as.numeric(), s16$AUC %>% as.numeric()))
+smg<-subset(df_comb.sgm, val == "CV")
+s16<-subset(df_comb, val == "CV")
+mean(c(smg$AUC %>% as.numeric(), s16$AUC %>% as.numeric()))
+```

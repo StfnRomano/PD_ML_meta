@@ -44,6 +44,7 @@ meta.b<-subset(meta, Study == "Boktor_2_2023" | Study == "Boktor_1_2023")
 m.w<-m.w[order(m.w$tube_id),]
 meta.b<-meta.b[order(meta.b$Other),]
 all(m.w$tube_id == meta.b$Other)
+stopifnot(all(m.w$tube_id == meta.b$Other))
 
 m.w<-left_join(m.w, meta.b, by = c("tube_id" = "Other"))
 
@@ -61,6 +62,7 @@ meta.bf<-subset(meta, Study == "Bedarf_2017")
 m.bf<-m.bf[order(m.bf$alias),]
 meta.bf<-meta.bf[order(meta.bf$SampleID),]
 all(m.bf$alias == meta.bf$SampleID)
+stopifnot(all(m.bf$alias == meta.bf$SampleID))
 
 m.bf<-left_join(m.bf, meta.bf, by = c("alias" = "SampleID"))
 
@@ -105,6 +107,9 @@ lm.conf<-function(microbiome.feats = log_kop,
                    est.age =  vector(length = ncol(microbiome.feats)),
 
                    description =  vector(length = ncol(microbiome.feats)))
+    l.mod.sapd<-vector(mode = "list", length = ncol(microbiome.feats))
+    l.mod.pd<-vector(mode = "list", length = ncol(microbiome.feats))
+    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) # Note thsi was also changed in may 2024
     
     for(i in 1:ncol(microbiome.feats)){
       id<-names(microbiome.feats)[i]
@@ -118,6 +123,10 @@ lm.conf<-function(microbiome.feats = log_kop,
       tmp$PD<-as.factor(tmp$PD)
       mod<-nlme::lme(bins ~ sex + age + PD, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude")
+      
+      l.mod.sapd[[i]]<-mod
+      names(l.mod.sapd)[i]<-id
+
       df.estimates$feats[i]<-id
       df.estimates$p.value.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[4]
       df.estimates$est.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[4]
@@ -130,6 +139,10 @@ lm.conf<-function(microbiome.feats = log_kop,
 
       mod<-nlme::lme(bins ~ PD, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude")
+      
+      l.mod.pd[[i]]<-mod
+      names(l.mod.pd)[i]<-id
+
       df.estimates$feats[i]<-id
       df.estimates$p.value.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
       df.estimates$est.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -146,7 +159,10 @@ lm.conf<-function(microbiome.feats = log_kop,
     df.estimates$p.value.sex.adj<-p.adjust(df.estimates$p.value.sex, method = "fdr")
     df.estimates$p.value.age.adj<-p.adjust(df.estimates$p.value.age, method = "fdr")
 
-  return(df.estimates)
+  setClass("lm.df",representation(df="data.frame",l.mod.sapd="list", l.mod.pd="list"))
+  data4<-new("lm.df",df=df.estimates,l.mod.sapd=l.mod.sapd,l.mod.pd=l.mod.pd)
+
+  return(data4)
   
 }
 
@@ -183,8 +199,11 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
-                  select.desc = "description")
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
+                  select.desc = "description") 
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.S4.rds")
+
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
+
 ```
 ## KOmod
 ```{r}
@@ -217,8 +236,9 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
                   select.desc = "description") 
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.S4.rds")
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
 
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
 ```
 
 ## KO
@@ -252,8 +272,9 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
                   select.desc = "Def") 
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.S4.rds")
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
 
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
 ```
 ## Taxa
 ```{r}
@@ -286,8 +307,9 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
                   select.desc = "none") 
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.S4.rds")
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
 
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
 ```
 ## GBM
 ```{r}
@@ -320,7 +342,9 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
                   select.desc = "descr") 
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.S4.rds")
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
+
 ```
 ## GMM
 ```{r}
@@ -352,8 +376,10 @@ stopifnot((all(rownames(log_kop_w) == meta.all$SampleID)))
 
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
-                  select.desc = "descr") 
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
+                  select.desc = "descr")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.S4.rds")
+saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
+
 ```
 
 # Summarise data
@@ -446,3 +472,4 @@ df.conf.form<-data.frame(Microbiome.feature = df.conf.feat$feats,
 write.table(df.conf.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = F, row.names = F, col.names = T, sep = "\t")
 
 ```
+

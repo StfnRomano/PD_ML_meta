@@ -9,17 +9,7 @@ editor_options:
 Load the required packages.
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("dplyr")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
 library(dplyr)
-
-
-
 source("/Scripts/Pevalence_functions.r")
 ```
 
@@ -87,7 +77,6 @@ for(i in 1:length(all.g)){
 }
 
 
-# here the sub-setting for the l_df was not done properly
 all.g<-lapply(all.g, function(x) x[,which(names(x) %in% meta$SampleID)])
 
 

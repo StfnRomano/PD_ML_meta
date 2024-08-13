@@ -34,38 +34,123 @@ Load metadata + datasets
 meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 all.g<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
 ```
-Chekf it the meta SapleID match with the one in the genus table.
+
+Check if in the meta SapleID match with the one in the mOTUs table.
+Add info about geography.
 
 ```{r}
-dim(meta)
-dim(all.g)
+stopifnot(all(meta$SampleID == names(all.g)))
+message("Are all samples in meta identical to the microbiome table? ", all(meta$SampleID == names(all.g)))
 
-# are all samples in meta in the OTU table?
-stopifnot(all(meta$SampleID %in% names(all.g)))
-all(meta$SampleID %in% names(all.g))
+# add countries and continent w/e
+
+w<-c("Bedarf_2017","Boktor_1_2023","Boktor_2_2023", "Wallen_2022")
+e<-c( "Mao_2021", "Qian_2020","Jo_2022")
+meta$WE<-ifelse(meta$Study %in% w, "West", "Est")
+meta$Continent<-ifelse(meta$Study %in% e, "Asia", "America")
+meta$Continent<-ifelse(meta$Study == "Bedarf_2017", "Europe", meta$Continent)
+meta$Country<-ifelse(meta$Study == "Bedarf_2017", "Germany", "China")
+meta$Country<-ifelse(meta$Study == "Jo_2022", "Korea", meta$Country)
+meta$Country<-ifelse(meta$Study  %in% c("Boktor_1_2023","Boktor_2_2023", "Wallen_2022"), "USA", meta$Country)
+
 ```
 
 # Beta
-Using BC dissimilarities
+Investigate BC dissimilarities between vs within
 ```{r, fig.width = 10, fig.height = 10}
-# add a rowname to meta
 rownames(meta)<-meta$SampleID
 all_phylo<-phyloseq(otu_table(all.g,taxa_are_rows = T), sample_data(meta))
 
 all_bc<-phyloseq::distance(all_phylo, method = "bray", square = T)
 
-# Permanova
-perm<-how(blocks = as.factor(meta$Study), nperm = 999)
+#####################################
+# Compare within vs between distances
+#####################################
 
-# Test disease
-(a.perst.bc<-adonis2(all_bc ~ PD, data = microbiome::meta(all_phylo), permutations = perm))
+# extract distances between samples within the same group
 
-# Test Study
-(a.st.bc<-adonis2(all_bc ~ Study, data = microbiome::meta(all_phylo)))
+same_study_distances <- function(dist_matrix, meta) {
+  study_dist_list <- list()
+  unique_studies <- unique(meta$Study)
+  for (study_id in unique_studies) {
+    study_samples <- subset(meta, Study == study_id)$SampleID
+    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples)
+    stopifnot(all(colnames(all_bc)[study_indices] == rownames(all_bc)[study_indices]))
+
+    study_distances <- as.matrix(dist_matrix)[study_indices, study_indices]
+    study_dist_list[[as.character(study_id)]] <- study_distances
+  }
+  return(study_dist_list)
+}
+
+# extract distances between samples in different groups
+different_study_distances <- function(dist_matrix, meta) {
+  study_dist_list <- list()
+  unique_studies <- unique(meta$Study)
+  for (study_id in unique_studies) {
+    study_samples <- subset(meta, Study == study_id)$SampleID 
+    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples) # this is a square matrix
+    other_indices <- which(!(colnames(as.matrix(dist_matrix)) %in% study_samples))
+    stopifnot(all(colnames(all_bc)[other_indices] != study_samples))
+
+    different_distances <- as.matrix(dist_matrix)[study_indices, other_indices]
+    study_dist_list[[as.character(study_id)]] <- different_distances
+  }
+  return(study_dist_list)
+}
+
+# extract distances
+l.sm <- same_study_distances(dist_matrix = all_bc,
+                                             meta =  meta)
+l.diff <- different_study_distances(dist_matrix = all_bc, 
+                                                       meta = meta)
+
+# format to perform t-test
+sm<-l.sm %>%
+  unlist(recursive = F) %>%
+  as.vector()
+bet<-l.diff %>%
+  unlist(recursive = F) %>%
+  as.vector()
+df.compare<-data.frame(dist = c(sm,bet),
+                       wb = c(rep("Within Studies", length =  length(sm)),
+                              rep("Between Studies", length = length(bet))))
+
+t.test(df.compare$dist ~ df.compare$wb, var.equal = T)
+
+df.compare$wb<-factor(df.compare$wb, 
+                      levels = c("Within Studies", "Between Studies"), 
+                      ordered = T)
+
+df.compare$seq<-rep("SMG", nrow(df.compare))
+saveRDS(df.compare, "/metaG/R_analyses/Taxonomy/RDS/df.compare.beta.rds")
+```
+
+
+## Permanova
+
+```{r}
+# define the permutation schema
+perm<-how(blocks = as.factor(meta$Study), nperm = 2000)
+
+## Desease
+(a.pd.bc<-adonis2(all_bc ~ PD, data = microbiome::meta(all_phylo), permutations = perm))
+
+## Study
+(a.st.bc<-adonis2(all_bc ~ Study, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## continent
+(a.cont.bc<-adonis2(all_bc ~ Continent, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## country
+(a.count.bc<-adonis2(all_bc ~ Country, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## we
+(a.count.bc<-adonis2(all_bc ~ WE, data = microbiome::meta(all_phylo), permutations = 2000))
 
 ```
 
-# Ordination conditioned by study
+## Ordination conditioned by study
 ```{r}
 nb.cols <- 3
 mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)

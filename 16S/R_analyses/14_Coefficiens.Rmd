@@ -9,16 +9,6 @@ editor_options:
 Load the required packages.
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "BiocManager", "tidyverse")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
-list.of.bioc <- c("phyloseq")
-new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages)) BiocManager::install(new.packages)
 library(phyloseq)
 library(vegan)
 library(dplyr)
@@ -109,10 +99,6 @@ d<-pc$points[] %>%
   as.data.frame()
 d$study<-gsub("_.*", "", rownames(d))
 d$var<-rownames(d)
-batch<-gsub("_5x10", "", d$var)
-batch<-gsub("_enet", "enet", batch)
-batch<-sub("([aA-zZ])*([0-9])*_", "", batch)
-d$batch<-as.factor(batch)
 
 #format the meta
 
@@ -126,14 +112,77 @@ all(meta.short$Study_2 == d$study)
 
 # merge
 d.m<-cbind.data.frame(d, meta.short)
-
-ggplot(d.m, aes(MDS1, MDS2)) +
-  geom_point(aes(fill = Continent), size = 5, stroke = 1, pch = 21) +
-  labs(title = "nMDS based on relative model weigths - Canberra distances") +
-  scale_fill_brewer(type = "div") +
-  theme_bw() +
-  labs(caption = "permanova Continent: df=3; R2=18.94%; p-value=0.42")
-ggsave("/16S/R_analyses/Figures/Country_nMDS.svg", device = "svg", width = 6, height = 4)
-
 adonis2(dist~Continent, data =  meta.short)
+
+nb.cols <- 24
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+
+# adjust study names
+d.m$Study_2<-as.character(d.m$Study_2)
+d.m$Study_2[d.m$Study_2 == "Aho"]<-"Aho_2019"
+d.m$Study_2[d.m$Study_2 == "Petrov"]<-"Petrov_2017"
+d.m$Study_2[d.m$Study_2 == "Keshavarzian"]<-"Keshavarzian_2015"
+d.m$Study_2[d.m$Study_2 == "Zhang"]<-"Zhang_2020"
+d.m$Study_2[d.m$Study_2 == "Nishiwaki"]<-"Nishiwaki_2020"
+d.m$Study_2[d.m$Study_2 == "Hopfner"]<-"Hopfner_2017"
+d.m$Study_2[d.m$Study_2 == "Weis"]<-"Weis_2019"
+d.m$Study_2[d.m$Study_2 == "Cirstea"]<-"Cirstea_2020"
+d.m$Study_2[d.m$Study_2 == "Tan"]<-"Tan_2021"
+d.m$Study_2[d.m$Study_2 == "Kenna"]<-"Kenna_2021"
+d.m$Study_2[d.m$Study_2 == "Wallen251"]<-"Wallen251_2021"
+d.m$Study_2[d.m$Study_2 == "Wallen151"]<-"Wallen151_2021"
+d.m$Study_2[d.m$Study_2 == "Jo"]<-"Jo_2022"
+d.m$Study_2[d.m$Study_2 == "Lubomski"]<-"Lubomski_2022"
+d.m$Study_2[d.m$Study_2 == "Heintz_Bushart"]<-"Heintz_Buschart_2017"
+d.m$Study_2[d.m$Study_2 == "Qian"]<-"Qian_2018"
+d.m$Study_2[d.m$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
+
+
+g16<-ggplot(d.m, aes(MDS1, MDS2)) +
+  geom_point(aes(color = Study_2), size = 5, stroke = 3, pch = 21) +
+  scale_color_manual(values = mycolors) +
+  geom_point(aes(fill = Continent), size = 5, stroke = 0, pch = 21) +
+  scale_fill_manual(values = c("#8C510A", "#F6E8C3", "#C7EAE5", "#01665E" )) +
+  theme_bw() +
+  theme(legend.text = element_text(size = 16),
+        legend.title = element_text(size =18),
+        axis.title = element_text(size =16),
+        axis.text = element_blank(),
+        plot.caption = element_text(size =16)) +
+  labs(color = "Study") 
+
+# load metaG
+d.mg<-readRDS("/metaG/R_analyses/Taxonomy/RDS/coeff_nmds.rds")
+
+nb.cols <- 18
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+d.mg$study<-gsub("_log.*", "", d.mg$var)
+
+g.smg<-ggplot(d.mg, aes(MDS1, MDS2)) +
+  geom_point(aes(color = study), size = 5, stroke = 3, pch = 21) +
+  scale_color_manual(values = mycolors) +
+  geom_point(aes(fill = Continent), size = 5, stroke = 0, pch = 21) +
+  scale_fill_manual(values = c("#8C510A", "#F6E8C3", "#C7EAE5", "#01665E" )) +
+  theme_bw() +
+  theme(legend.text = element_text(size = 16),
+        legend.title = element_text(size =18),
+        axis.title = element_text(size =16),
+        axis.text = element_blank(),
+        plot.caption = element_text(size =16)) +
+  labs(color = "Study") +
+  guides(fill = "none")
+
+
+coeff<-cowplot::plot_grid(g16, g.smg,
+                   ncol = 2,
+                   align = "h",
+                   axis = "bl",
+                   rel_widths =c(1.1,1),
+                   rel_heights = c(1,1),
+                   labels = c("auto"), 
+                   label_size = 20)
+
+cowplot::save_plot("/16S/R_analyses/Figures/Coeff_cont.svg", coeff, 
+                   base_width = 18, base_height = 6)
 ```
+

@@ -81,10 +81,15 @@ lm.medications <- function(microb.feats = log_kop,
     tmp<-microb.feats[,i]
     stopifnot(all(rownames(tmp) == metadata$SampleID))
     tmp<-cbind.data.frame(bins = tmp, metadata[,c(3:13,15)])
-    l.k.kp[[i]]<-regsubsets(bins ~ ., data = tmp, nvmax = 12)
+    l.k.kp[[i]]<-regsubsets(bins ~ ., data = tmp, nvmax = 12) # as drugs are 11 + 1 the PD
     k<-summary(l.k.kp[[i]])
     var<-k$which[which(k$cp == min(k$cp)),]
-    var<-which(var == TRUE)[-1] # select only included variable and remove intercept. They are ids of variables
+    # match of the intercept idx in case it cane be false
+    idx<-which(names(var) == "(Intercept)")
+    if (var[idx] == FALSE) {
+      stop("Intercept is not TRUE")
+    } else {message("Intercept is True")
+            var<-which(var == TRUE)[-idx]} # select only included variable and remove intercept. They are ids of variables
     n.var<-names(tmp)[c(1,var)]
     
     df.selection$feats[i]<-names(microb.feats)[i]

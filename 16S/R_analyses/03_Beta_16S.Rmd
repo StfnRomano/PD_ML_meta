@@ -37,7 +37,10 @@ set.seed(456)
 Load metadata + datasets
 ```{r}
 meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
-all.g<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
+e<-c("Zhang", "Nishiwaki", "Tan", "Jo", "Qian")
+w<-c("Petrov", "Keshavarzian", "Hopfner", "Aho", "Weis", "Cirstea", "Kenna", "Wallen251", "Wallen151", "Lubomski", "Heintz_Bushart", "Pietrucci")
+meta$WE<-ifelse(meta$Study %in% w, "West", "Est")
+all.g<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/all_g_TSS.rds")
 
 # Double check samples match
 dim(meta)
@@ -52,14 +55,113 @@ Use BC dissimilarities
 all_phylo<-phyloseq(otu_table(all.g,taxa_are_rows = T), sample_data(meta))
 all_bc<-phyloseq::distance(all_phylo, method = "bray")
 
-# Permanova
+# Function to extract distances between samples belonging to the same group
+same_study_distances <- function(dist_matrix, meta) {
+  study_dist_list <- list()
+  unique_studies <- unique(meta$Study)
+  for (study_id in unique_studies) {
+    study_samples <- subset(meta, Study == study_id)$SampleID
+    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples)
+    stopifnot(all(colnames(all_bc)[study_indices] == rownames(all_bc)[study_indices]))
 
-# Desease
-perm<-how(blocks = as.factor(meta$Study_2), nperm = 999)
+    study_distances <- as.matrix(dist_matrix)[study_indices, study_indices]
+    study_dist_list[[as.character(study_id)]] <- study_distances
+  }
+  return(study_dist_list)
+}
+
+# Function to extract distances between samples belonging to different groups
+different_study_distances <- function(dist_matrix, meta) {
+  study_dist_list <- list()
+  unique_studies <- unique(meta$Study)
+  for (study_id in unique_studies) {
+    study_samples <- subset(meta, Study == study_id)$SampleID 
+    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples) # this is a square matrix
+    other_indices <- which(!(colnames(as.matrix(dist_matrix)) %in% study_samples))
+    stopifnot(all(colnames(all_bc)[other_indices] != study_samples))
+
+    different_distances <- as.matrix(dist_matrix)[study_indices, other_indices]
+    study_dist_list[[as.character(study_id)]] <- different_distances
+  }
+  return(study_dist_list)
+}
+
+# Example usage
+l.sm <- same_study_distances(dist_matrix = all_bc,
+                                             meta =  meta)
+l.diff <- different_study_distances(dist_matrix = all_bc, 
+                                                       meta = meta)
+
+# Add here a double double check
+w<-unique(l.sm$Wallen_2022 %>% rownames(), l.sm$Wallen_2022 %>% colnames())
+meta.w<-subset(meta, Study == "Wallen_2022")
+stopifnot(all(w == meta.w$SampleID))
+
+sm<-l.sm %>%
+  unlist(recursive = F) %>%
+  as.vector()
+bet<-l.diff %>%
+  unlist(recursive = F) %>%
+  as.vector()
+
+df.compare<-data.frame(dist = c(sm,bet),
+                       wb = c(rep("Within Studies", length =  length(sm)),
+                              rep("Between Studies", length = length(bet))))
+
+my_comparisons = list( c("Within Studies", "Between Studies"))
+t.test(df.compare$dist ~ df.compare$wb, var.equal = T)
+
+df.compare$wb<-factor(df.compare$wb, 
+                      levels = c( "Within Studies", "Between Studies"), ordered = T)
+df.compare$seq<-rep("16S", nrow(df.compare))
+# laod SMG
+df.compare.smg<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.compare.beta.rds")
+
+df.comp.all<-rbind.data.frame(df.compare, df.compare.smg)
+
+ggplot(df.comp.all, aes(wb, dist)) +
+  geom_boxplot(mapping = aes(color = wb), 
+               width = 0.8,
+               size = 1.5, outlier.colour = NA) +
+  theme_bw() +
+  ylab("Bray-Curties dissimilarities") +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.position = "none", 
+        plot.margin = margin(1, 1, 1, 1, "cm"),
+        strip.text = element_text(size = 12)) +
+  scale_color_grey() +
+  ylim(0, 1) +
+  facet_wrap(~seq) +
+  xlab("Comparisons") +
+  superb::showSignificance( x = c(1,2), y = c(0.2), +0.02, "***", 
+                            textParams    = list(size = 6,
+                            colour= "black"))  
+
+ggsave("~/Documents/EMBL_ML_PD/16S/R_analyses/Figures//Dist.bet.with.all.svg", 
+       width = 8, height = 5, device = "svg")
+```
+
+
+Permanova
+```{r}
+## Desease
+perm<-how(blocks = as.factor(meta$Study_2), nperm = 2000)
 (a.pd.bc<-adonis2(all_bc ~ PD, data = microbiome::meta(all_phylo), permutations = perm))
 
-# Study
-(a.st.bc<-adonis2(all_bc ~ Study_2, data = microbiome::meta(all_phylo)))
+## Study
+(a.st.bc<-adonis2(all_bc ~ Study_2, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## continent
+(a.cont.bc<-adonis2(all_bc ~ Continent, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## country
+(a.count.bc<-adonis2(all_bc ~ Country, data = microbiome::meta(all_phylo), permutations = 2000))
+
+## we
+(a.count.bc<-adonis2(all_bc ~ WE, data = microbiome::meta(all_phylo), permutations = 2000))
 
 ```
 
@@ -70,7 +172,7 @@ nb.cols <- 18
 mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
 
 
-all_dbrda_bc<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo  ~ 1 + Condition(Study))
+all_dbrda_bc<-ordinate(all_phylo, method = "CAP", distance = all_bc, formula = all_phylo  ~ 1 + Condition(Study_2))
 plot_ordination(all_phylo, all_dbrda_bc, "samples", shape="PD", color = "Study_2") +
                 theme_bw() +
                 scale_fill_manual(values = mycolors) +
@@ -98,112 +200,93 @@ sc.m$PD<-as.factor(sc.m$PD)
 all_dbrda_bc
 
 
-(o<-ggplot(sc.m, aes(MDS2, MDS1, colour = PD, shape = PD)) +
-    geom_point(size = 3, alpha = 0.5) +
+(opd16S<-ggplot(sc.m, aes(MDS2, MDS1, colour = PD, shape = PD)) +
+    geom_point(size = 3.5, alpha = 0.5) +
     theme_minimal() +
     scale_colour_manual(values = c("#525266", "#ff6666")) +
-    xlab("MDS1 [8.7%]") +
+    xlab("MDS1 [8.6%]") +
     ylab("MDS2 [4.9%]") +
-     theme(plot.caption  = element_text(size = 10),
-        plot.title = element_text(size = 16, face = "bold"),
-        plot.subtitle = element_text(size =14),
+    theme(legend.position = "none",
         panel.grid = element_blank(),
         axis.text = element_blank(),
         panel.border = element_rect(color = "black",
                                     fill = NA,
-                                    size = 1),
-        legend.position = c(0.1, 0.15))+
-     annotate("text",  x=-1.9, y=2.2, label= "16S", fontface = "bold") +
+                                    linewidth = 1),
+        axis.title = element_text(size = 14))+
+        annotate("text", x=min(sc.m$MDS1)-0.35, y=max(sc.m$MDS2)+0.5, 
+                 label= "16S", fontface = "bold", size = 5) + 
     guides(colour = "none") +
     labs(shape = "Condition"))
 
-# Make a df for the permanova
-df.perm.16s<-data.frame(p_value=c(0.001, 0.001),
-                        df = c(16, 1),
-                        F_stat = c(49.03, 31.39),
-                        R2=c(20.0, 1.0))
-gtable.16S<-ggtexttable(df.perm.16s, rows = c("Study", "Disease status"), theme = ttheme("light"))
-
-
-(og<-ggMarginal(o, 
-                groupFill = TRUE, 
-                groupColour = T,
-                size = 5,
-                type = "boxplot"))
-
-
-og<-plot_grid(og,gtable.16S,ncol=1, rel_heights = c(2,0.8))
+# box plot for coordinates
+df.sc.pd<-data.frame(mds = c(sc.m$MDS1, sc.m$MDS2),
+                  PD = c(sc.m$PD, sc.m$PD),
+                  coord = c(rep("MDS1", nrow(sc.m)), rep("MDS2", nrow(sc.m))),
+                  seqs = rep("16S", nrow(sc.m)*2))
+(bx.opd16S<-ggplot(df.sc.pd, aes(PD, mds, color = PD, fill = PD)) +
+  geom_boxplot(alpha = 0.6, outlier.shape =  NA) +
+  theme_minimal() +
+  scale_colour_manual(values = c("#525266", "#ff6666")) +
+  scale_fill_manual(values = c("#525266", "#ff6666")) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_blank(),
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 10, angle = 45),
+        strip.text = element_text(size=11),
+        axis.title.x = element_text(size = 14))+
+    xlab("Disease status") +
+    facet_wrap(~coord))
+###############
 
 metag<-readRDS("/metaG/R_analyses/Taxonomy/RDS/dbRDA_df.rds")
+metag$PD<-as.character(metag$PD)
 metag$PD[metag$PD == "HC"]<-"CTRL"
 
-(om<-ggplot(metag, aes(MDS1, MDS2, colour = PD, shape = PD)) +
-    geom_point(size = 4, alpha = 0.5) +
+(opdSMG<-ggplot(metag, aes(MDS1, MDS2, colour = PD, shape = PD)) +
+    geom_point(size = 3.5, alpha = 0.5) +
     theme_minimal() +
     scale_colour_manual(values = c("#525266", "#ff6666")) +
     xlab("MDS1 [6%]") +
     ylab("MDS2 [3.7%]") +
-    theme(plot.caption  = element_text(size = 10),
-        plot.title = element_text(size = 16, face = "bold"),
-        plot.subtitle = element_text(size =14),
+    theme(legend.position = "none",
         panel.grid = element_blank(),
         axis.text = element_blank(),
         panel.border = element_rect(color = "black",
                                     fill = NA,
-                                    size = 1),
-        legend.position = c(0.1, 0.15))+
-        annotate("text", x=-1.9, y=2.2, label= "SMG", fontface = "bold") +
+                                    linewidth = 1),
+        axis.title = element_text(size = 14))+
+        annotate("text", x=min(metag$MDS1)+0.05, y=max(metag$MDS2)-0.05, 
+                 label= "SMG", fontface = "bold", size = 5) +    
     labs(colour = "Condition", shape = "Condition") +
     guides(shape = "none"))
+# boxplot
+df.sc.pd.smg<-data.frame(mds = c(metag$MDS1, metag$MDS2),
+                  PD = c(metag$PD, metag$PD),
+                  coord = c(rep("MDS1", nrow(metag)), rep("MDS2", nrow(metag))),
+                  seqs = rep("SMG", nrow(metag)*2))
 
-(omg<-ggMarginal(om, 
-                 groupFill = TRUE, 
-                 groupColour = T,
-                 size = 5,
-                type = "boxplot"))
-
-# make df for the metaG permanova
-df.perm<-data.frame(p_value=c(0.001, 0.001),
-                        df = c(6, 1),
-                        F_stat = c(18.23, 7.94),
-                        R2=c(7.7,0.6))
-gtable<-ggtexttable(df.perm, rows = c("Study","Disease status"), theme = ttheme("light"))
-omg<-plot_grid(omg,gtable,ncol=1, rel_heights = c(2,0.8))
-
-
-
-(pcos.plots<-cowplot::plot_grid(og, omg, ncol = 2, align = "hv",
-          axis = "bl",rel_widths =c(1,1), labels = c( "A", "B"),
-          label_y = 0.97, label_x = c(-0.002,-0.03)))
-
-
-# make titles
-title <- ggdraw() + 
-  draw_label(
-    "dbRDA based on Bray-Curtis dissimilarities",
-    fontface = 'bold', size =14,
-    x = 0.02,
-    y = 0.3,
-    hjust = 0
-  ) +
-  theme(
-    plot.margin = margin(0, 0, 0, 0)
-  )
-
-
-
-(pcos.plots.title<-cowplot::plot_grid(title, 
-                                      pcos.plots, 
-                                      align = "hv", 
-                                      nrow = 3, 
-                                      rel_heights = c(0.07, 0.07, 1 ,1),
-                                      rel_widths = c(10,10)))
-
+(bx.opdSMG<-ggplot(df.sc.pd.smg, aes(PD, mds, color = PD, fill = PD)) +
+  geom_boxplot(alpha = 0.6, outlier.shape = NA) +
+  theme_minimal() +
+  scale_colour_manual(values = c("#525266", "#ff6666")) +
+  scale_fill_manual(values = c("#525266", "#ff6666")) +
+  theme(panel.grid = element_blank(),
+        panel.border = element_blank(),
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 10, angle = 45), 
+        strip.text = element_text(size=11),
+        axis.title.x = element_text(size = 14))+
+    xlab("Disease status") +
+    facet_wrap(~coord))
 ```
 
 ### Then not conditioned by study
 ```{r}
-nb.cols <- 18
+nb.cols <- 24
 mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
 
 
@@ -220,87 +303,149 @@ plot_ordination(all_phylo, all_dbrda_bcs, "samples", shape="PD", color = "Study_
     ggtitle("dbRDA NOT-Conditioned Study - BC")
 
 
-sc<-scores(all_dbrda_bcs, display = "sites") %>% as.data.frame() # extract the coordinates
+sc.nc<-scores(all_dbrda_bcs, display = "sites") %>% as.data.frame() # extract the coordinates
 meta<-meta[order(meta$SampleID),]
-all(rownames(sc) == meta$SampleID)
+all(rownames(sc.nc) == meta$SampleID)
 
-sc.m<-cbind.data.frame(sc, meta)
-sc.m$PD<-as.factor(sc.m$PD)
+# rename metadata
+meta$Study_2<-as.character(meta$Study_2)
+meta$Study_2[meta$Study_2 == "Aho"]<-"Aho_2019"
+meta$Study_2[meta$Study_2 == "Petrov"]<-"Petrov_2017"
+meta$Study_2[meta$Study_2 == "Keshavarzian"]<-"Keshavarzian_2015"
+meta$Study_2[meta$Study_2 == "Zhang"]<-"Zhang_2020"
+meta$Study_2[meta$Study_2 == "Nishiwaki"]<-"Nishiwaki_2020"
+meta$Study_2[meta$Study_2 == "Hopfner"]<-"Hopfner_2017"
+meta$Study_2[meta$Study_2 == "Weis"]<-"Weis_2019"
+meta$Study_2[meta$Study_2 == "Cirstea"]<-"Cirstea_2020"
+meta$Study_2[meta$Study_2 == "Tan"]<-"Tan_2021"
+meta$Study_2[meta$Study_2 == "Kenna"]<-"Kenna_2021"
+meta$Study_2[meta$Study_2 == "Wallen251"]<-"Wallen251_2021"
+meta$Study_2[meta$Study_2 == "Wallen151"]<-"Wallen151_2021"
+meta$Study_2[meta$Study_2 == "Jo"]<-"Jo_2022"
+meta$Study_2[meta$Study_2 == "Lubomski"]<-"Lubomski_2022"
+meta$Study_2[meta$Study_2 == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+meta$Study_2[meta$Study_2 == "Qian"]<-"Qian_2018"
+meta$Study_2[meta$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
+###########
+
+sc.nc.m<-cbind.data.frame(sc.nc, meta)
+sc.nc.m$PD<-as.factor(sc.nc.m$PD)
 all_dbrda_bc
 
-(os<-ggplot(sc.m, aes(MDS2, MDS1, colour = Study_2, shape = PD)) +
-    geom_point(size = 3, alpha = 0.5) +
+(os16S<-ggplot(sc.nc.m, aes(MDS2, MDS1, colour = Study_2, shape = PD)) +
+    geom_point(size = 3.5, alpha = 0.5) +
     theme_minimal() +
     scale_colour_manual(values = mycolors) +
     xlab("MDS1 [9.4%]") +
     ylab("MDS2 [7.3%]") +
-     theme(legend.position = "none",
-        plot.caption  = element_text(size = 10),
-        plot.title = element_text(size = 16, face = "bold"),
-        plot.subtitle = element_text(size =14),
+    theme(legend.position = "none",
         panel.grid = element_blank(),
         axis.text = element_blank(),
         panel.border = element_rect(color = "black",
                                     fill = NA,
-                                    size = 1))+
-    annotate("text",  x=-2.2, y=1.5, label= "16S", fontface = "bold") +
-    labs(shape = "Condition") +
-    guides(colour = "none"))
+                                    linewidth = 1),
+        axis.title = element_text(size = 14))+
+        annotate("text", x=min(sc.nc.m$MDS1)-0.45, y=max(sc.nc.m$MDS2), 
+                 label= "16S", fontface = "bold", size = 5) +  
+    guides(shape = "none"))
 
-(os<-ggMarginal(os, 
-                  groupFill = TRUE, 
-                  groupColour = TRUE,
-                  size = 5,
-                  type = "boxplot"))
+# boxplot
+scmf<-data.frame(mds = c(sc.nc.m$MDS1, sc.nc.m$MDS2),
+                  study = c(sc.nc.m$Study_2, sc.nc.m$Study_2),
+                  coord = c(rep("MDS1", nrow(sc.nc.m)), 
+                            rep("MDS2", nrow(sc.nc.m))),
+                  seqs = rep("16S", nrow(sc.nc.m)*2))
+(bx.os16S<-ggplot(scmf, aes(reorder(study, -mds), mds, fill = study, color = study)) +
+  geom_boxplot(alpha = 0.6, lwd  = 0.7, outlier.shape = NA) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = mycolors) +
+  scale_color_manual(values = mycolors) +
+  facet_wrap(~coord, scales = "free_x", ncol = 4) +
+  xlab("Study") +
+  ylab("Coordinates")+
+  theme(panel.grid = element_blank(), 
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 10, angle = 45), 
+        strip.text = element_text(size=11),
+        axis.title.x = element_text(size = 14)))
+
+
 
 metag<-readRDS("/metaG/R_analyses/Taxonomy/RDS/dbRDA_df_study.rds")
-metag$Study_2<-gsub("_20.*", "", metag$Study)
+metag$PD<-as.character(metag$PD)
 metag$PD[metag$PD == "HC"]<-"CTRL"
 
-(oms<-ggplot(metag, aes(MDS1, MDS2, colour = Study_2, shape = PD)) +
-    geom_point(size = 3, alpha = 0.5) +
+(osSMG<-ggplot(metag, aes(MDS1, MDS2, colour = Study, shape = PD)) +
+    geom_point(size = 3.5, alpha = 0.5) +
     theme_minimal() +
     scale_colour_manual(values = mycolors) +
     xlab("MDS1 [7.2%]") +
     ylab("MDS2 [4.3%]") +
-    theme(legend.position =  "none",
-          plot.caption  = element_text(size = 10),
-        plot.title = element_text(size = 16, face = "bold"),
-        plot.subtitle = element_text(size =14),
+    theme(legend.position = "none",
         panel.grid = element_blank(),
         axis.text = element_blank(),
         panel.border = element_rect(color = "black",
                                     fill = NA,
-                                    size = 1)) +
-        annotate("text", x=-1.5, y=1.5, label= "SMG", fontface = "bold") +
-    labs(colour = "Study"))
+                                    linewidth = 1),
+        axis.title = element_text(size = 14))+
+        annotate("text", x=min(metag$MDS1)+0.05, y=max(metag$MDS2), 
+                 label= "SMG", fontface = "bold", size = 5) +
+    guides(shape = "none"))
+# boxplot
+scmg<-data.frame(mds = c(metag$MDS1, metag$MDS2),
+                  study = c(metag$Study, metag$Study),
+                  coord = c(rep("MDS1", nrow(metag)), rep("MDS2", nrow(metag))),
+                  seqs = rep("SMG", nrow(metag)*2))
 
-(omgs<-ggMarginal(oms, 
-                  groupFill = TRUE, 
-                  groupColour = TRUE,
-                  size = 5,
-                  type = "boxplot"))
+(bx.osSMG<-ggplot(scmg, aes(reorder(study, -mds), mds, fill = study, color = study)) +
+  geom_boxplot(alpha = 0.6, lwd  = 0.7, outlier.shape = NA) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_fill_manual(values = mycolors) +
+  scale_color_manual(values = mycolors) +
+  facet_wrap(~coord, scales = "free_x", ncol = 4) +
+  xlab("Study") +
+  ylab("Coordinates")+
+  theme(panel.grid = element_blank(), 
+        legend.position = "none",
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x = element_text(size = 10, angle = 45), 
+        strip.text = element_text(size=11),
+        axis.title.x = element_text(size = 14)))
 
 
+(box.all<-cowplot::plot_grid(bx.os16S, bx.osSMG, bx.opd16S, bx.opdSMG,
+                             ncol = 4, 
+                             align = "h",
+                             axis = "bl",
+                             rel_widths =c(4,1.8,0.7,0.7), 
+                             labels = c("e", "f", "g","h"),
+                             label_size = 18,
+                             label_y = 0.97, 
+                             label_x = c(-0.002,-0.002)))
 
-(pcos.plots<-cowplot::plot_grid(os, omgs, og, omg, 
+
+(pcos.plots<-cowplot::plot_grid(os16S, osSMG, opd16S, opdSMG, 
                                 ncol = 2, 
                                 align = "h",
                                 axis = "bl",
-                                rel_widths =c(1,1), 
-                                rel_heights = c(1,1.4),
+                                rel_widths =c(1,1,1,1), 
+                                rel_heights = c(1,1,1,1),
                                 labels = c( "a", "b", "c", "d"),
-                                label_y = 0.97, label_x = c(-0.002,-0.03)))
+                                label_y = 0.97, 
+                                label_x = c(-0.002,-0.002),
+                                label_size = 18))
 
 
-(pcos.plots.title<-cowplot::plot_grid(title, pcos.plots, 
+(pcos.plots.box<-cowplot::plot_grid(pcos.plots, box.all, 
                                       align = "v", 
                                       nrow = 2, 
-                                      rel_heights = c(0.1, 2 ,2),
+                                      rel_heights = c(4 ,2),
                                       rel_widths = c(10,10)))
-
-cowplot::save_plot("/16S/R_analyses/Figures/dbRDA_BC_Only_plots_metaG_Study_boxplot.svg", pcos.plots.title, 
-                   base_width = 9, base_height = 10)
 
 ```
 

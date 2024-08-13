@@ -107,35 +107,6 @@ df.sign$dirDA<-rep("black", length = nrow(df.sign))
 df.sign[which(df.sign$bins %in% gen),]$dirDA<-"red"
 
 
-# make titles
-title <- ggdraw() + 
-  draw_label(
-    "Differentially abundant Genera between CTRL and PD",
-    fontface = 'bold',
-    x = 0.05,
-    y = 0.7,
-    hjust = 0
-  ) +
-  theme(
-    # add margin on the left of the drawing canvas,
-    # so title is aligned with left edge of first plot
-    plot.margin = margin(0, 0, 0, 7)
-  )
-subtitle <- ggdraw() + 
-  draw_label(
-    "Generalised Odd Ratios were pooled using random effect meta-analysis. 16 studies, n=3165",size = 12,
-    x = 0.05, y = 0.7,
-    hjust = 0
-  ) +
-  theme(
-    # add margin on the left of the drawing canvas,
-    # so title is aligned with left edge of first plot
-    plot.margin = margin(0, 0, 0, 7)
-  )
-
-
-
-
 
 #Extract Single study DA
 
@@ -222,6 +193,7 @@ df.sign$dir[df.sign$dir == "HC"] <- "CTRL"
   theme(legend.key.size = unit(0.4, "cm"),
         legend.direction = "vertical",
         axis.title.y = element_text(size = 13),
+        axis.text.x = element_text(size = 13),
         legend.position = c(0.98, 0.98),
         legend.justification = c("right", "top"),
         legend.box.just = "right",
@@ -241,15 +213,8 @@ df.sign$dir[df.sign$dir == "HC"] <- "CTRL"
                          labels = "AUTO",
                          label_x = c(0,-0.07, -0.07)))
 
-pgg<-plot_grid(
-  title, subtitle, p.gg,
-  ncol = 1,
-  # rel_heights values control vertical title margins
-  rel_heights = c(0.02, 0.02, 1))
-
-
-pgg
-cowplot::save_plot(pgg, 
+p.gg
+cowplot::save_plot(p.gg, 
           filename = "/16S/R_analyses/Figures/GenODDs_prev.svg", 
           base_width = 14, 
           base_height = 16)
@@ -313,37 +278,11 @@ write.table(x = supp.table,
 
 # Plot together with metag
 ```{r}
-subset(df.sign,p.adjust < 0.05 & abs(TE.random) > 0.177 ) %>% dim()
-subset(df.sign,p.adjust < 0.05 & abs(TE.random) > 0.177 ) -> df.sign
+subset(df.sign,p.adjust < 0.05 & abs(TE.random) > 0.179 ) %>% dim()
+subset(df.sign,p.adjust < 0.05 & abs(TE.random) > 0.179 ) -> df.sign
 
 # Load a new panel to change the ratio of facet_wrap
 library(ggh4x)
-
-title <- ggdraw() + 
-  draw_label(
-    "Differentially abundant taxa between CTRL and PD",
-    fontface = 'bold', size = 16,
-    x = 0.05,
-    y = 0.7,
-    hjust = 0
-  ) +
-  theme(
-    # add margin on the left of the drawing canvas,
-    # so title is aligned with left edge of first plot
-    plot.margin = margin(0, 0, 0, 7)
-  )
-subtitle <- ggdraw() + 
-  draw_label(
-    "Generalised Odd Ratios were pooled using random effect meta-analysis",size = 14,
-    x = 0.05, y = 0.7,
-    hjust = 0
-  ) +
-  theme(
-    # add margin on the left of the drawing canvas,
-    # so title is aligned with left edge of first plot
-    plot.margin = margin(0, 0, 0, 7)
-  )
-
 
 df.cross.adj<-df.cross %>%
   group_by(Cohort) %>%
@@ -544,7 +483,6 @@ gtgrob$grobs[[8]]$children[[2]]$grobs[[1]]$children[[1]]$label
 all(gtgrob$grobs[[8]]$children[[2]]$grobs[[1]]$children[[1]]$label == df.sign$taxa2)
 
 gtgrob$grobs[[8]]$children[[2]]$grobs[[1]]$children[[1]]$gp$font <- factor(df.sign$bold, levels = c("plain", "bold"))
-gtgrob$grobs[[8]]$children[[2]]$grobs[[1]]$children[[1]]$gp$col <- factor(df.sign$dirDA, levels = c("black", "red"))
 
 # metaG
 gtgrob$grobs[[9]]$children[[2]]$grobs[[1]]$children[[1]]$label
@@ -552,7 +490,6 @@ gtgrob$grobs[[9]]$children[[2]]$grobs[[1]]$children[[1]]$label
 all(gtgrob$grobs[[9]]$children[[2]]$grobs[[1]]$children[[1]]$label == df.sign.metaG$taxa2)
 
 gtgrob$grobs[[9]]$children[[2]]$grobs[[1]]$children[[1]]$gp$font <- factor(df.sign.metaG$bold, levels = c("plain", "bold"))
-gtgrob$grobs[[9]]$children[[2]]$grobs[[1]]$children[[1]]$gp$col <- factor(df.sign.metaG$dirDA, levels = c("black", "red"))
 
 grid::grid.draw( gtgrob )
 ####################################################
@@ -565,15 +502,8 @@ p.gg<-cowplot::plot_grid(ggplotify::as.ggplot( gtgrob ), s.g, ridge.ef,
                          label_x = c(0,-0.07, -0.07))
 
 
-
-pgg<-plot_grid(
-  title, subtitle, p.gg,
-  ncol = 1,
-  # rel_heights values control vertical title margins
-  rel_heights = c(0.02, 0.02, 1))
-
-pgg
-cowplot::save_plot(pgg, 
+p.gg
+cowplot::save_plot(p.gg, 
           filename = "/16S/R_analyses/Figures/GenODDs_16SmetaG_40.svg", 
           base_width = 12, 
           base_height = 14)

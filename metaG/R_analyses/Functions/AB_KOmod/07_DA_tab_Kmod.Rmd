@@ -15,7 +15,7 @@ df.sign<-readRDS("/metaG//R_analyses/Functions/AB_KOmod/RDS/df.sign.KOmod.rds")
 meta$PD[meta$PD == "HC"]<-"CTRL"
 ```
 
-Make a pretty graph
+Format
 ```{r}
 
 #Single study ODD Ratio 

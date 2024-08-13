@@ -1,5 +1,5 @@
 ---
-title: "metaG fig prep"
+title: "metaG CSV fig prep"
 author: "SRomano"
 output: html_document
 editor_options: 
@@ -13,7 +13,7 @@ library(dplyr)
 # Load + format for plotting
 ```{r}
 
-perf_sing_log<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+perf_sing_log<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
 #take only 5%
 perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
 perf_sing_log$batch<-rep("Not corrected", nrow(perf_sing_log))

@@ -11,7 +11,7 @@ editor_options:
 Load the required packages.
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "ggplot2", "RColorBrewer", "meta", "genodds")
+list.of.packages <- c("dplyr", "meta", "genodds")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 if (!requireNamespace("BiocManager", quietly = TRUE)){
@@ -21,15 +21,13 @@ if (!requireNamespace("BiocManager", quietly = TRUE)){
 library(dplyr)
 library(genodds)
 library(meta)
-library("readxl")
 
 
 set.seed(9821)
 ```
 
 
-Load the data and format meta-data cocnsistently across datasets
-```{r}
+Load the data
 
 l_df<-readRDS("metaG/R_analyses/Taxonomy/RDS/l.df_g_TSS.rds")
 meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
@@ -70,7 +68,7 @@ l_df<-lapply(l_df, function(x) x[,which(names(x) %in% spec)])
 # Calculate DA using GenOdds
 ```{r, message =F, warning =F, error=FALSE}
 # source the function
-source("R_analyses_metaG/Pre_processing_functions/DA_function_gen_odd.R")
+source("/Scripts/DA_function_gen_odd.R")
 
 df.cross<-calcualte_da_genOdds(list.df = l_df, 
                 meta = meta,

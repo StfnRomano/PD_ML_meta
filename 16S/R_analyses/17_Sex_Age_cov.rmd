@@ -15,8 +15,9 @@ meta<-readRDS("16S/R_analyses/RDS/meta.rds")
 # Define function
 ```{r}
 lm.conf<-function(microbiome.feats = log_kop,
-                  metadata = meta.all){
-  
+                  metadata = meta.all,
+                  select.desc = "descr"){
+    
   df.estimates<-data.frame(feats = vector(length = ncol(microbiome.feats)),
                    
                    p.value.sex.age.PD = vector(length = ncol(microbiome.feats)),
@@ -32,7 +33,10 @@ lm.conf<-function(microbiome.feats = log_kop,
                    est.age =  vector(length = ncol(microbiome.feats)),
 
                    description =  vector(length = ncol(microbiome.feats)))
-    
+    l.mod.sapd<-vector(mode = "list", length = ncol(microbiome.feats))
+    l.mod.pd<-vector(mode = "list", length = ncol(microbiome.feats))
+    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) #note this was adjusted in may 24
+
     for(i in 1:ncol(microbiome.feats)){
       id<-names(microbiome.feats)[i]
 
@@ -40,13 +44,17 @@ lm.conf<-function(microbiome.feats = log_kop,
       tmp<-microbiome.feats[,id]
       stopifnot(all(rownames(tmp) == metadata$SampleID))
       tmp<-cbind.data.frame(bins = tmp, metadata)
-      tmp$Age<-as.numeric(tmp$Age)
-      tmp$gender<-as.factor(tmp$gender)
+      tmp$age<-as.numeric(tmp$Age)
+      tmp$sex<-as.factor(tmp$gender)
       tmp$PD<-as.factor(tmp$PD)
       tmp$Study_2<-as.factor(tmp$Study_2)
 
       mod<-nlme::lme(bins ~ gender + Age + PD, random = ~ 1 | Study_2,
                data = tmp, na.action = "na.exclude")
+      
+      l.mod.sapd[[i]]<-mod
+      names(l.mod.sapd)[i]<-id
+
       df.estimates$feats[i]<-id
       df.estimates$p.value.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[4]
       df.estimates$est.sex.age.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[4]
@@ -59,11 +67,18 @@ lm.conf<-function(microbiome.feats = log_kop,
 
       mod<-nlme::lme(bins ~ PD, random = ~ 1 | Study_2,
                data = tmp, na.action = "na.exclude")
+      
+      l.mod.pd[[i]]<-mod
+      names(l.mod.pd)[i]<-id
+
       df.estimates$feats[i]<-id
       df.estimates$p.value.PD[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
       df.estimates$est.PD[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
 
-
+      if(select.desc != "none"){
+      df.estimates$description[i] <- df.sign[df.sign$bins == id, select.desc]
+      } else {df.estimates$description[i] <- NA}
+      
     }
     # adjust pvalues
     df.estimates$p.value.sex.age.PD.adj<-p.adjust(df.estimates$p.value.sex.age.PD, method = "fdr")
@@ -71,7 +86,10 @@ lm.conf<-function(microbiome.feats = log_kop,
     df.estimates$p.value.sex.adj<-p.adjust(df.estimates$p.value.sex, method = "fdr")
     df.estimates$p.value.age.adj<-p.adjust(df.estimates$p.value.age, method = "fdr")
 
-  return(df.estimates)
+  setClass("lm.df",representation(df="data.frame",l.mod.sapd="list", l.mod.pd="list"))
+  data4<-new("lm.df",df=df.estimates,l.mod.sapd=l.mod.sapd,l.mod.pd=l.mod.pd)
+
+  return(data4)
   
 }
 
@@ -110,8 +128,10 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(rownames(log_kop_w) == meta.all$SampleID))
 
 df.estimates<-lm.conf(microbiome.feats = log_kop_w,
-                  metadata = meta.all) 
-
+                  metadata = meta.all,
+                  select.desc = "none") 
+saveRDS(df.estimates, "/16S/R_analyses/RDS/Cov.Sex.Age.S4.rds")
+df.estimates<-df.estimates@df
 ```
 
 # Summarise data

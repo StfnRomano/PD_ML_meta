@@ -11,7 +11,7 @@ library("tidyverse")
 
 
 ```{r}
-load("metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
+load("/metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
 ```
 
 define function to refit the model with the right variables
@@ -29,7 +29,13 @@ lm.refit.meds<-function(microbiome.feats = log_kop,
                    est.conc = vector(length = ncol(microbiome.feats)),
                    description =  vector(length = ncol(microbiome.feats)),
                    variables = vector(length = ncol(microbiome.feats)))
-    
+    l.mod.all<-vector(mode = "list", length = length(df.selection$feats))
+    l.mod.pd<-vector(mode = "list", length = length(df.selection$feats))
+
+    names(l.mod.all)<-df.selection$feats
+    names(l.mod.pd)<-df.selection$feats
+    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) # note changed in MAy 2024
+
     for(i in 1:nrow(df.selection)){
       id<-df.selection$feats[i]
       form<-df.selection$variables[i]
@@ -40,30 +46,33 @@ lm.refit.meds<-function(microbiome.feats = log_kop,
       tmp<-microbiome.feats[,id]
       stopifnot(all(rownames(tmp) == metadata$SampleID))
       tmp<-cbind.data.frame(bins = tmp, metadata[,3:15])
-      mod<-lm(formula(paste0("bins ~  ", form)),
+      mod<-lm(formula(paste0("bins ~  ", form)), 
                data = tmp, na.action = "na.exclude")
+      l.mod.all[[i]]<-mod
       df.estimates$feats[i]<-id
       df.estimates$p.value.cov.PD[i]<-broom::tidy(mod)$p.value[nrow(broom::tidy(mod))]
       df.estimates$est.cov.PD[i]<-broom::tidy(mod)$estimate[nrow(broom::tidy(mod))]
       df.estimates$variables[i]<-form
       
       mod<-lm(bins ~ PD, data = tmp, na.action = "na.exclude")
-    
+      l.mod.pd[[i]]<-mod
+
       df.estimates$p.value.PD[i]<-broom::tidy(mod)$p.value[nrow(broom::tidy(mod))]
       df.estimates$est.PD[i]<-broom::tidy(mod)$estimate[nrow(broom::tidy(mod))]
       
       if(select.desc != "none"){
       df.estimates$description[i] <- df.sign[df.sign$bins == id, select.desc]
       } else {df.estimates$description[i] <- NA}
-      
-
-    
+     
+  
     }
     # adjust pvalues
     df.estimates$p.value.cov.PD.adj<-p.adjust(df.estimates$p.value.cov.PD, method = "fdr")
     df.estimates$p.value.PD.adj<-p.adjust(df.estimates$p.value.PD, method = "fdr")
 
-  return(df.estimates)
+  setClass("lm.df", slots=list(lms.all="list", lms.pd="list", df="data.frame"))
+  out<-new("lm.df", lms.all = l.mod.all, lms.pd = l.mod.pd, df = df.estimates)
+  return(out)
   
 }
 
@@ -78,7 +87,7 @@ kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GBM.rds")
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -101,8 +110,10 @@ stopifnot(all(rownames(log_kop) == m.w.m$SampleID))
 df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         metadata = m.w.m,
                         df.selection = gbm@df)
-  
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gbm_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gbm_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gbm_leaps_lmVSco.rds")
+
 ```
 
 # GMM
@@ -114,7 +125,7 @@ kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GMM.rds")
+df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -137,14 +148,15 @@ df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         metadata = m.w.m,
                         df.selection = gmm@df)
 
-
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gmm_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gnm_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.gmm_leaps_lmVSco.rds")
 ```
 
 
 # Tax
 ```{r}
-kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+kop<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
@@ -176,8 +188,9 @@ df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         select.desc = "none")
 
 
-
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.taxa_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.taxa_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.taxa_leaps_lmVSco.rds")
 ```
 
 # KO path
@@ -214,8 +227,9 @@ df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         select.desc = "description")
 
 
-
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_leaps_lmVSco.rds")
 ```
 
 
@@ -228,7 +242,7 @@ kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AB_KOpath/RDS/df.sign.KOmod.rds")
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -252,8 +266,9 @@ df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         df.selection = komod@df, 
                         select.desc = "description")
 
-
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_leaps_lmVSco.rds")
 ```
 
 
@@ -290,8 +305,9 @@ df.estimates<-lm.refit.meds(microbiome.feats = log_kop,
                         df.selection = ko@df, 
                         select.desc = "Def")
 
-
-saveRDS(df.estimates, "metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_leaps_lmVSco.rds")
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_leaps_lmVSco.models.rds")  
+df.estimates<-df.estimates@df
+saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_leaps_lmVSco.rds")
 ```
 
 
@@ -356,10 +372,10 @@ df.perc$prop.conf[6]<-round(a[1]/b[1]*100, digits = 1)
 
 # check, format, and save
 df.perc$pot.conf<-rep("non.PD.medications", nrow(df.perc))
-tmp<-readRDS(file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
+tmp<-readRDS(file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
 df.perc<-rbind.data.frame(df.perc, tmp)
 df.perc
-saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs_other.meds.rds")
+saveRDS(df.perc, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs_other.meds.rds")
 
 
 

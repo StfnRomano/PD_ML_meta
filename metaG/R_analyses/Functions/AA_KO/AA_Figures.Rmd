@@ -8,7 +8,7 @@ editor_options:
 
 ```{r, root.dir}
 library(ggplot2)
-library(dplyr)
+library(tidyverse)
 ```
 
 #KO
@@ -32,12 +32,12 @@ df<-data.frame(
   training.data = rep("Wallen_2022", 6),
   testing.data = rep("Wallen_2022", 6),
   ML = c("lasso", "lasso_ll", "enet", "ridge", "ridge_ll", "random_forest"),
-  AUC = c(lasso_5x10@auc$Wallen_2022, 
-          lassoll_5x10@auc$Wallen_2022, 
-          enet_5x10@auc$Wallen_2022, 
-          ridge_5x10@auc$Wallen_2022, 
-          ridge_ll_5x10@auc$Wallen_2022, 
-          rf_5x10@auc$Wallen_2022),
+  AUC = c(lasso_5x10@auc$Wallen_2022$auc,
+          lassoll_5x10@auc$Wallen_2022$auc, 
+          enet_5x10@auc$Wallen_2022$auc, 
+          ridge_5x10@auc$Wallen_2022$auc, 
+          ridge_ll_5x10@auc$Wallen_2022$auc, 
+          rf_5x10@auc$Wallen_2022$auc),
   norm = rep("log", 6))
 
 perf_log<-rbind.data.frame(perf_log,df)
@@ -56,6 +56,15 @@ df_comb$AUC<-as.numeric(df_comb$AUC)
 df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
 df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
 df.diag<-df_comb[1:42,]
+
+
+df_comb$method <- rep("CSV", length = nrow(df_comb))
+df_comb$method[1:42]<-"CV"
+
+
+saveRDS(df_comb, "/metaG/R_analyses/Functions/KO//RDS/df.comb.cv.scv.rds")
+
+
 ```
 
 
@@ -71,13 +80,15 @@ ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
         axis.title = element_text(size = 12),
         legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
-  facet_wrap(~ ML)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data")
 
 ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log.svg",
        width = 10, 
@@ -126,13 +137,17 @@ ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
         legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
-  facet_wrap(~ ML)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data")
 
 ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GMM.svg", 
        width = 10, 
@@ -185,13 +200,17 @@ ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
         legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
-  facet_wrap(~ ML)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data")
 
 ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GBM.svg",
        width = 10, 
@@ -202,7 +221,6 @@ ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GBM.svg",
 
 # Combine tables
 ```{r}
-library(tidyverse)
 df.sign.KOmod <- readRDS("/metaG/R_analyses/Functions/KO_modules/RDS/df.sign.KOmod.rds")
 module_pathways <- read_delim("/metaG/R_analyses/Functions/KO/module_pathways.list", col_names = FALSE)
 

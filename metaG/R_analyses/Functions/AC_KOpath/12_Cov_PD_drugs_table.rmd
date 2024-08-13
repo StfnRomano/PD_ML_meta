@@ -21,7 +21,7 @@ df.perc$prop.conf[1]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOm_lmm.RData")
 df.conf$type<-rep("KO_mod", nrow(df.conf))
 df.form<-rbind.data.frame(df.form, df.conf)
-df.sign<-readRDS("metaG/R_analyses/Functions/KO_modules//RDS/df.sign.KOmod.rds")
+df.sign<-readRDS("metaG/R_analyses/Functions/AB_KOmod//RDS/df.sign.KOmod.rds")
 df.perc$prop.conf[2]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 
 # k_path
@@ -59,7 +59,7 @@ df.form<-data.frame(Microbiome.features = df.form$feats,
                     MAO_B_inhibitors.est = df.form$MAO_B_inhibitors.est,
                     carbidopa.pvale = df.form$carbidopa.pvale,
                     carbidopa.pvale.adj = df.form$carbidopa.pvale.adj,
-                    carbidopa.pvale.adj = df.form$carbidopa.est,
+                    carbidopa.pvale.est = df.form$carbidopa.est,
                     dopamine_agonists.pvale = df.form$dopamine_agonists.pvale,
                     dopamine_agonists.pvale.adj = df.form$dopamine_agonists.pvale.adj,
                     dopamine_agonists.est = df.form$dopamine_agonists.est,
@@ -83,11 +83,11 @@ df.form<-data.frame(Microbiome.features = df.form$feats,
                     description = df.form$descr,
                     feature.type = df.form$type)
 
-write.table(df.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt", 
+write.table(df.form, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt", 
             quote = F, sep = "\t", row.names = F, col.names = T)
 
 df.perc$pot.conf<-rep("PD.medications", nrow(df.perc))
 df.perc
-saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
+saveRDS(df.perc, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs.lmm.rds")
 ```
 

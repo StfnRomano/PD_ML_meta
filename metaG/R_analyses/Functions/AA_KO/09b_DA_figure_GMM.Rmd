@@ -131,7 +131,7 @@ title <- ggdraw() +
   )
 subtitle <- ggdraw() + 
   draw_label(
-    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1325",size = 12,
+    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1324",size = 12,
     x = 0.05, y = 0.7,
     hjust = 0
   ) +
@@ -179,6 +179,7 @@ write.table(df.pos.neg, "/metaG/R_analyses/Functions/AA_KO/df.pos.neg.GMM.txt",
 ```{r}
 
 all(df.sign$bins == df.sign.uniq$bin)
+stopifnot(all(df.sign$bins == df.sign.uniq$bin))
 
 supp.table<-data.frame(GMM_ID = df.sign$bins,
                        description = df.sign$descr, 

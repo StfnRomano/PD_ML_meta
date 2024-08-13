@@ -36,6 +36,12 @@ df_comb$AUC<-round(df_comb$AUC, digits = 2) *100
 df.auc<-subset(df_comb, AUC > 85 | AUC < 50)
 df.diag<-df_comb[1:42,]
 
+df_comb$method <- rep("CSV", length = nrow(df_comb))
+df_comb$method[1:42]<-"CV"
+
+
+saveRDS(df_comb, "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.comb.cv.scv.rds")
+
 ```
 
 
@@ -51,13 +57,17 @@ ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
                        limits=c(40,100))+
   theme_bw() +
   theme(axis.text.x = element_text(angle = 90, hjust=0.95,vjust=0.2),
-        strip.text.x = element_text(size = 12),
+        strip.text = element_text(size = 12),
         axis.text = element_text(size = 12),
-        axis.title = element_text(size = 12),
+        axis.title = element_text(size = 14),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 14),
         legend.position = "right") +
   facet_wrap(~ ML)+
-  geom_tile(data = df.diag, fill = NA, color = "white", size = 2)+
-  facet_wrap(~ ML)
+  geom_tile(data = df.diag, fill = NA, color = "white", linewidth = 2)+
+  facet_wrap(~ ML) +
+  xlab("Test data") +
+  ylab("Training data")
 
 ggsave("/metaG/R_analyses/Functions/AC_KOpath/Figures/CSV_5log.svg",
        width = 10, 

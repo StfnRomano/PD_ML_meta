@@ -68,12 +68,6 @@ m.w.m.pd$levodopa[m.w.m.pd$levodopa == "not provided"]<- NA
 m.w.m.pd$levodopa<-as.factor(m.w.m.pd$levodopa)
 unique(m.w.m.pd$levodopa)
 
-
-m.w.m.pd$PD[m.w.m.pd$levodopa == "not provided"]<- NA
-m.w.m.pd$levodopa<-as.factor(m.w.m.pd$levodopa)
-unique(m.w.m.pd$levodopa)
-
-
 # check if metadata if formatted well
 sapply(m.w.m.pd, unique)
 ```
@@ -108,17 +102,23 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
                amantadine.pvale = vector(length = ncol(log_kop_w)),
                amantadine.est = vector(length = ncol(log_kop_w)))
 
+  # create a list to store the models
+  drugs<-c("MAO_B_inhibitors", "carbidopa", "dopamine_agonists", "levodopa", "rasagiline", "ropinirole", "selegiline", "amantadine")
+  l.mod<-vector(mode = "list", length = length(drugs))
+  names(l.mod)<-drugs
+  l.mod<-lapply(l.mod, function(x) vector(mode = "list", length = ncol(log_kop_w)))
   # run the for loop for each feats for building lms
+  stopifnot(all(rownames(log_kop_w) == m.w.m.pd$SampleID)) 
+
     for(i in 1:ncol(log_kop_w)){
       df$feats[i]<-names(log_kop_w)[i]
       tmp<-log_kop_w[,i]
       stopifnot(all(rownames(tmp) == m.w.m.pd$SampleID))
       tmp<-cbind.data.frame(bins = tmp, m.w.m.pd)
-      # transform not provided in NA
-      tmp[tmp == "not provided"]<- NA
-      
+    
       x<-try(mod<-nlme::lme(bins ~ MAO_B_inhibitors, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$MAO_B_inhibitors[[i]]<-mod
       if(class(x) != "try-error"){
         df$MAO_B_inhibitors.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$MAO_B_inhibitors.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -129,6 +129,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
     
       x<-try(mod<-nlme::lme(bins ~ carbidopa, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$carbidopa[[i]]<-mod
       if(class(x) != "try-error"){
         df$carbidopa.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$carbidopa.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -139,6 +140,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
     
       x<-try(mod<-nlme::lme(bins ~ dopamine_agonists, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$dopamine_agonists[[i]]<-mod
       if(class(x) != "try-error"){
         df$dopamine_agonists.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$dopamine_agonists.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -149,6 +151,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
       
       x<-try(mod<-nlme::lme(bins ~ levodopa, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$levodopa[[i]]<-mod
       if(class(x) != "try-error"){
           df$levodopa.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
           df$levodopa.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -159,6 +162,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
     
       x<-try(mod<-nlme::lme(bins ~ rasagiline, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$rasagiline[[i]]<-mod
         if(class(x) != "try-error"){
           df$rasagiline.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
           df$rasagiline.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -169,6 +173,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
     
       x<-try(mod<-nlme::lme(bins ~ ropinirole, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$ropinirole[[i]]<-mod
       if(class(x) != "try-error"){
         df$ropinirole.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$ropinirole.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -179,6 +184,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
       
       x<-try(mod<-nlme::lme(bins ~ selegiline, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+      l.mod$selegiline[[i]]<-mod
       if(class(x) != "try-error"){
         df$selegiline.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$selegiline.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -189,6 +195,7 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
       
        x<-try(mod<-nlme::lme(bins ~ amantadine, random = ~ 1 | Study,
                data = tmp, na.action = "na.exclude"))
+       l.mod$amantadine[[i]]<-mod
        if(class(x) != "try-error"){
         df$amantadine.pvale[i]<-as.data.frame(summary(mod)$tTable)$`p-value`[2]
         df$amantadine.est[i]<-as.data.frame(summary(mod)$tTable)$Value[2]
@@ -207,7 +214,9 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
   df$selegiline.pvale.adj<-p.adjust(df$selegiline.pvale, "fdr")
   df$amantadine.pvale.adj<-p.adjust(df$amantadine.pvale, "fdr")
 
-  return(df)
+  setClass("lm.df", slots=list(lms="list", df="data.frame"))
+  out<-new("lm.df", lms = l.mod, df = df)
+  return(out)
 }
 
 
@@ -244,10 +253,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
-  
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
 
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.kopath.rds")
 ```
 
 ```{r}
@@ -299,7 +312,7 @@ if(nrow(df.conf) != 0){
 }
 
 
-save.image("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
+save.image("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
 
 ```
 
@@ -331,8 +344,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
+
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.komod.rds")
   
 ```
 
@@ -418,8 +437,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
+
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.ko.rds")
 
 ```
 
@@ -505,8 +530,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
+
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.taxa.rds")
 
 ```
 
@@ -591,8 +622,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
+
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.GMM.rds")
 
 ```
 
@@ -678,8 +715,14 @@ log_kop_w<-log_kop_w[order(rownames(log_kop_w)),]
 stopifnot(all(m.w.m.pd$SampleID == rownames(log_kop_w)))
 
 # run lms
-df<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
+l.lm.kopath<-lm.pd.drugs(log.microbiome.feats = log_kop_w,
                       metadata = m.w.m.pd)
+df<-l.lm.kopath@df
+# extract the models and create a single list
+mod<-l.lm.kopath@lms %>%
+  unlist(recursive = F)
+
+saveRDS(mod, "/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drugs.lm.GBM.rds")
 
 ```
 

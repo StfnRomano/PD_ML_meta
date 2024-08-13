@@ -9,18 +9,7 @@ editor_options:
 Load the required packages.
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "BiocManager",  "tidyverse",)
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
-list.of.bioc <- c("phyloseq", "grDevices")
-new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages)) BiocManager::install(new.packages)
 library(phyloseq)
-library(vegan)
 library(dplyr)
 library(SIAMCAT)
 library(tidyverse)
@@ -53,6 +42,26 @@ lapply(lridge, dim)
 
 df1<-do.call(rbind, lridge) %>% as.data.frame()
 
+# repeat the same thing for wallen and then rbind everything
+load("/metaG/R_analyses/Functions/KO/RData/metaG_Sinlge_5perc_log_Wallen.w2500.2x5.RData")
+ridge_5x10@siamcat$Wallen_2022[[1]]
+
+lridge<-coefficient.extraction(studies = unique(meta$Study) %>% as.character(),
+                                list.models = ridge_5x10,
+                                model.parallel = T,
+                                string.to.add = "log_ridge_5x10",
+                                select = "mean.weight")
+lridge<-lapply(lridge, function(x) mutate(x, relative.weigths= x$overall.average / sum(abs(x$overall.average))))
+lapply(lridge, dim) 
+
+tmp2<-do.call(rbind, lridge) %>% as.data.frame()
+
+# rbind
+df1<-rbind.data.frame(tmp1, tmp2)
+
+# check that the number of study is correct
+x<-gsub("_log.*", "", df1$study)
+stopifnot(length(unique(x)) == 7)
 ```
 
 ## Save results for table/figs

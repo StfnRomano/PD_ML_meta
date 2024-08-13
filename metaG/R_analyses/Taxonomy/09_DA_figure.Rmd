@@ -52,7 +52,7 @@ Match motus with GTDB genera
 ```{r}
 
 
-mgtdb<-read.delim("/R_analyses_metaG/mOTUs_3.0.0_GTDB_tax.tsv", header = F)
+mgtdb<-read.delim("/mOTUs_3.0.0_GTDB_tax.tsv", header = F)
 
 df.sign$motus<-gsub("[]]", "", sub(".* [[]", "", df.sign$bins))
 df.sign$Genus<-vector(length = nrow(df.sign))
@@ -123,7 +123,7 @@ title <- ggdraw() +
   )
 subtitle <- ggdraw() + 
   draw_label(
-    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1325",size = 12,
+    "Generalised Odd Ratios were pooled using random effect meta-analysis. 6 studies, n=1324",size = 12,
     x = 0.05, y = 0.7,
     hjust = 0
   ) +
@@ -174,7 +174,7 @@ ggplot(df.sign.uniq, aes(x = tot.sign.taxa, y =reorder(bin, -TE))) +
        x = "#Studies")+
       scale_x_continuous(breaks = c(0,1,2,3), limits = c(0,3)))
 # add the ML coefficients
-df.pos.neg<-readRDS("/metaG//R_analyses/Taxonomy/RDS/Ridge_df.pos.neg.rds")
+df.pos.neg<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Ridge_df.pos.neg.rds")
 df.pos.neg<-subset(df.pos.neg, taxa %in% df.sign$bins)
 
 # Format for plotting

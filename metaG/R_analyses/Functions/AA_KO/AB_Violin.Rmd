@@ -6,9 +6,10 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r, root.dir}
+```{r}
 library(ggplot2)
 library(dplyr)
+library(ggnewscale)
 ```
 
 # Load data and metadata
@@ -37,12 +38,12 @@ df<-data.frame(
   study = rep("Wallen_2022", 6),
   prev = rep("5% in 2 std ", 6),
   ML = c("lasso", "lasso_ll", "enet", "ridge", "ridge_ll", "random_forest"),
-  AUC = c(lasso_5x10@auc$Wallen_2022, 
-          lassoll_5x10@auc$Wallen_2022, 
-          enet_5x10@auc$Wallen_2022, 
-          ridge_5x10@auc$Wallen_2022, 
-          ridge_ll_5x10@auc$Wallen_2022, 
-          rf_5x10@auc$Wallen_2022),
+  AUC = c(lasso_5x10@auc$Wallen_2022$auc, 
+          lassoll_5x10@auc$Wallen_2022$auc, 
+          enet_5x10@auc$Wallen_2022$auc, 
+          ridge_5x10@auc$Wallen_2022$auc, 
+          ridge_ll_5x10@auc$Wallen_2022$auc, 
+          rf_5x10@auc$Wallen_2022$auc),
   norm = rep("log", 6),
   funct = rep("KO", 6)
 )
@@ -110,29 +111,51 @@ l.all$AUC<-round(l.all$AUC, 2)*100
 csv.all<-rbind.data.frame(KO.csv, KOm.csv, KOpath.csv, tax.csv, gmm.csv, gbm.csv)
 csv.all$type<-rep("CSV", nrow(csv.all))
 csv.all$AUC<-as.numeric(csv.all$AUC)
-csv.all$AUC<-round(csv.all$AUC, 2)*100
+csv.all$AUC<-csv.all$AUC*100
 
 ridge.all.tax.f<-subset(df.all, ML  == "ridge")
 
-ridge.all.tax.f$AUC<-round(ridge.all.tax.f$AUC, 2)*100
+ridge.all.tax.f$AUC<-ridge.all.tax.f$AUC*100
 names(ridge.all.tax.f)<-c("study", "prev", "ML", "AUC", "norm", "profile", "type")
 
-(r<-ggplot(ridge.all.tax.f, aes(x =  profile,y = study,  fill = AUC)) +
-  geom_tile(color = "black") +
-  geom_text(aes(label = AUC), color = "black", size = 4) +
-  scale_fill_viridis_c(option = "H",
-                       breaks=c(50,70,100),
-                       limits=c(40,100))+
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90,hjust=0.95,vjust=0.2),
-        panel.background = element_blank(),
-        panel.grid = element_blank(),
-        panel.border = element_blank(),
-        axis.text = element_text(size = 12)))
-ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/AUC_across_functions_tiles.svg", 
-       width = 8, 
-       height = 6)
+```
+# make paired tests
+```{r}
+df.all.test<-data.frame(model = c(rownames(csv.all), l.all$study.out, ridge.all.tax.f$study),
+                        AUC = c(csv.all$AUC, l.all$AUC, ridge.all.tax.f$AUC),
+                        val = c(csv.all$type, l.all$type, ridge.all.tax.f$type),
+                          prof = c(as.character(csv.all$funct), as.character(l.all$funct), as.character(ridge.all.tax.f$profile)))
 
+df.all.test<-df.all.test[order(df.all.test$model),]
+
+ggplot(df.all.test, aes(prof, AUC, fill = val)) +
+  geom_boxplot()
+
+# lm + emmeans            
+l.perf<-split(df.all.test, as.factor(df.all.test$val))
+l.emm<-vector(mode = "list", length = length(l.perf))
+names(l.emm)<-names(l.perf)
+for(i in 1:length(l.perf)){
+  message("Running ", unique(l.perf[[i]]$val))
+  message("---> paired")
+  mod<-nlme::lme(AUC ~ prof, data = l.perf[[i]], random = ~ 1 | model)
+  print(car::Anova(mod))
+  print(anova(mod))
+  print(summary(mod))
+  em<-emmeans::emmeans(object = mod, pairwise ~ prof, adjust = "fdr")
+  print(em)
+  l.emm[[i]]<-as.data.frame(em$contrasts)
+}
+
+df.emm<-do.call(rbind, l.emm)
+df.emm$Validation.type<-c(rep("CSV", nrow(df.emm)/3),
+				rep("LOSO", nrow(df.emm)/3), 
+				rep("within-study CV", nrow(df.emm)/3))
+write.table(df.emm, file = "/metaG/R_analyses/Functions/KO/RDS/Table.emmeans.compare.AUCs.txt",
+            quote = F,
+            sep = "\t",
+            row.names = F,
+            col.names = T)
 ```
 # Prepare dataframe needed
 
@@ -164,8 +187,13 @@ df.all<-data.frame(AUC = c(csv.all$AUC, df.points$AUC),
                    funct = c(csv.all$funct, df.points$method),
                    type = c(csv.all$type , df.points$type %>%
                               as.character()))
-
-ggplot() + 
+df.mean.std.csv <- df.all%>% 
+  group_by(type, funct) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC),
+            min = min(AUC),
+            max = max(AUC))
+(ggplot() + 
       geom_hline(yintercept=50, linetype = "dashed", 
                 color = "darkgray", size=1) +
 
@@ -176,42 +204,47 @@ ggplot() +
                               y = AUC, 
                               fill = type),
                 trim = T,
-                size = 0.7,
-                alpha = 0.5,
+                size = 0.5,
+                alpha = 0.2,
                 position = "dodge", 
-                scale = "width") +
-  scale_fill_manual(values = c("#0072B2", "#FFED00", "white")) +
-    # add stats summaries
-    stat_summary(data = df.all,
-                mapping = aes(x = funct,
-                              y = AUC,
-                              group = type,
-                              color = type),
-                fun.data = "mean_sdl",
-                color = "black",
-                fun.args = list(mult = 1),
-                geom = "pointrange",
-                size = 1.3,
-                position = position_dodge2(width = 0.9)) +
- 
-    stat_summary(data = df.all,
-                mapping = aes(x = funct,
-                              y = AUC,
-                              group = type,
-                              color = type),
-                fun.data = "mean_sdl",
-                fun.args = list(mult = 1),
-                geom = "pointrange",
-                size = 1,
-                color = "lightgray",
-                position = position_dodge2(width = 0.9)) +
-  labs(
+                scale = "width", show.legend = F) +
+    scale_fill_manual(values = c("white", "#DCC83C", "#285AA0")) +
+
+    # add error bar with margin
+    geom_errorbar(data = df.mean.std.csv,
+                  mapping = aes(x = funct,
+                                ymin = mean - stdev, 
+                                ymax = mean + stdev,
+                                group = type), 
+                  width = 0,  color = "black", size = 1.5,
+                  position = position_dodge(width = 0.9)) +
+
+    geom_errorbar(data = df.mean.std.csv,
+                  mapping = aes(x = funct,
+                                ymin = mean - stdev, 
+                                ymax = mean + stdev,
+                                color = type), 
+                  width = 0, size = 1.25,
+                  position = position_dodge(width = 0.9), show.legend = F) +
+
+      # add stats summaries
+    new_scale_fill() +
+    geom_point(data = df.mean.std.csv, 
+               mapping = aes(funct, 
+                           mean,
+                           fill = type),
+               pch = 21,
+               size = 5,
+               position = position_dodge2(width = 0.9)) +
+    scale_fill_manual(values = c("darkgray", "#FFED00", "#0072B2")) +
+    scale_color_manual(values = c("darkgray", "#FFED00", "#0072B2")) +
+    labs(
         x = "Profiles",
         fill = "ML approaches") +
-  theme(axis.text.x = element_text(),
-        axis.text = element_text(size = 12),
+
+  theme(axis.text = element_text(size = 12),
         axis.title = element_text(size = 14),
-        title = element_text(size = 14)) 
+        title = element_text(size = 14)) )
 
 
 
@@ -220,7 +253,28 @@ ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/Functions_Only_Violin_merged.s
        width = 8, 
        height = 5) 
 
+Calculate overall means
+```{r}
+s16<-readRDS("/16S/R_analyses/RDS/df.comb.cv.scv.rds")
+ls16<-readRDS("/16S/R_analyses/RDS/ls.out.cv.scv.rds")
+s16<-subset(s16, ML == "ridge")
 
+df.tmp<-data.frame(model =  c(s16$training.data, ls16$study.out),
+                   AUC = c(s16$AUC, ls16$AUC),
+                   val = c(s16$method, ls16$method),
+                   prof =  rep("16S", nrow(s16) + nrow(ls16)))
+df.tmp[df.tmp$val == "CV",]$val <- "within-study CV"
 
+df.all.test.16<-rbind.data.frame(df.all.test, df.tmp)
 
+df.all.test.16 %>%
+  group_by(val, prof) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC),
+            N = n())
+
+df.all.test.16 %>%
+  group_by(val) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC))
 ```

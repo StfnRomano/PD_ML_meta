@@ -16,11 +16,10 @@ if (!requireNamespace("BiocManager", quietly = TRUE)){
     install.packages("BiocManager")}
 
 
-list.of.bioc <- c("phyloseq", "grDevices")
+list.of.bioc <- c("phyloseq")
 new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
 if(length(new.packages)) BiocManager::install(new.packages)
 library(phyloseq)
-library(vegan)
 library(dplyr)
 library(SIAMCAT)
 library(tidyverse)

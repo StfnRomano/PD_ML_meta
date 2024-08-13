@@ -11,7 +11,7 @@ editor_options:
 Load the required packages.
 
 ```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "ggplot2", "RColorBrewer", "meta", "genodds")
+list.of.packages <- c("tidyverse", "ggplot2", "RColorBrewer", "meta", "genodds")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
 if (!requireNamespace("BiocManager", quietly = TRUE)){
@@ -111,6 +111,7 @@ df$p.adjust<-p.adjust(df$pval.random, method = "fdr")
 subset(df,p.adjust<0.05 ) %>%
   dim()
 df.sign<-subset(df,p.adjust<0.05 ) 
+
 ```
 
 ## Add description
@@ -199,8 +200,8 @@ names(gbm.t)<-gsub("Boktor_[1-2]_[0-9]*[.]", "", names(gbm.t))
 
 gbm.t<-gbm.t[, order(names(gbm.t))]
 meta<-meta[order(meta$Sample_ID),]
-all(names(gbm.t) == meta$Sample_ID)
-saveRDS(gbm.t, "/metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
+stopifnot(all(names(gbm.t) == meta$Sample_ID))
+saveRDS(gbm.t, "/metaG/R_analyses/Functions/KO/RDS/GBM.rds")
 
 df.gbm.go<-calcualte_da_genOdds(list.df = gbm, 
                 meta = meta,
@@ -261,8 +262,8 @@ names(gmm.t)<-gsub("Boktor_[1-2]_[0-9]*[.]", "", names(gmm.t))
 
 gmm.t<-gmm.t[, order(names(gmm.t))]
 meta<-meta[order(meta$Sample_ID),]
-all(names(gmm.t) == meta$Sample_ID)
-saveRDS(gmm.t, "/metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
+stopifnot(all(names(gmm.t) == meta$Sample_ID))
+saveRDS(gmm.t, "/metaG/R_analyses/Functions/KO/RDS/GMM.rds")
 
  
 df.gmm.go<-calcualte_da_genOdds(list.df = gmm, 

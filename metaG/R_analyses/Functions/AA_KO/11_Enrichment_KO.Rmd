@@ -10,24 +10,32 @@ editor_options:
   
 Perform enrichment using clusterprofiler
 ```{r}
+# load pckgs
 library(clusterProfiler)
+library(tidyverse)
 
-# load data 
-df<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
-# Load path
+# load data
+df<-readRDS("/metaG/R_analyses/Functions/KOpath//RDS/all_no0_TSS_KOpath.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/KO/RDS/df.sign.KO.rds")
+
 path<-read.delim("path_filtered0.5_9May23", header = T)
-path<-path[,c(1,3,7,9)]
-path$ko<-gsub("path:", "", path$V1)
+path<-path[,c(1,3,9)]
+
+
+# define universe
+pt<-rownames(df)
+universe<-subset(path, ko %in% pt)
 
 # format data
 bins<-subset(df.sign, dir == "CTRL")
 bins<-bins[order(bins$TE.random),]
 
 # perform enrichment
+## CTRL
 er<-enricher(gene = bins$bins,
+             universe = universe$KO,
              TERM2GENE = data.frame(term = path$ko,
-                                    gene = path$V3),
+                                    gene = path$KO),
              pvalueCutoff = 0.1,
              minGSSize = 5,
              maxGSSize = 500,
@@ -36,27 +44,32 @@ er<-enricher(gene = bins$bins,
 sign.hc<-subset(er@result, p.adjust < 0.05) %>%
   left_join(path[!duplicated(path$ko),], by = c("Description" = "ko"))
 
-# Check how many KOs are in the enriched path
-sign.hc<-sign.hc[,c(1,3:6,8:9,13)]
+sign.hc<-sign.hc[,c(1,3:6,8:9,12)]
 sign.hc$dir<-rep("CTRL", nrow(sign.hc))
 
-er<-enricher(gene = subset(df.sign, dir == "PD")$bins,
+## PD
+bins<-subset(df.sign, dir == "PD")
+bins<-bins[order(bins$TE.random),]
+
+er<-enricher(gene = bins$bins,
              minGSSize = 5,
              maxGSSize = 500,
+             universe = universe$KO,
              TERM2GENE = data.frame(term = path$ko,
-                                    gene = path$V3),
+                                    gene = path$KO),
              pAdjustMethod = "fdr")
 
 sign.pd<-subset(er@result, p.adjust < 0.05) %>%
   left_join(path[!duplicated(path$ko),], by = c("Description" = "ko"))
-sign.pd<-sign.pd[,c(1,3:6,8:9,13)]
+
+sign.pd<-sign.pd[,c(1,3:6,8:9,12)]
 sign.pd$dir<-rep("PD", nrow(sign.pd))
 
 df.enrich<-rbind.data.frame(sign.hc, sign.pd)
 View(df.enrich)
 
 write.table(df.enrich,
-            "metaG/R_analyses/Functions/AA_KO/RDS/ClusterProfiler_combined.txt",
+            "/metaG/R_analyses/Functions/AA_KO/RDS/ClusterProfiler_combined.txt",
             sep = "\t",
             col.names = T,
             row.names = F,

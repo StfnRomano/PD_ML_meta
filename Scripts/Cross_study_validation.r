@@ -13,9 +13,9 @@ cross.study.validation<-function(list.models,
                                  name.study.var.hold = NULL,
                                  label.hold = NULL,
                                  case.hold = NULL,
-                                 direction = "auto",
+                                 direction = "<",
 # is.model.list ask whether the models for each studies are organized in a list of models. This is to accommodate the data structure resulting from the parallel SIAMCAT runs.
-# The results of these runs is a siamcat object, which is a list of lenght = #Studies. Each study than contains the X number of models as a result of reps x ncores
+# The results of these runs is a siamcat object, which is a list of length = #Studies. Each study than contains the X number of models as a result of reps x ncores
                                  
                                  is.model.list = FALSE){ 
   if(is.model.list == TRUE){
