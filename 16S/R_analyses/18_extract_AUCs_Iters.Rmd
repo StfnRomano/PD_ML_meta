@@ -1,0 +1,118 @@
+---
+title: "extract aucs"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: console
+---
+
+Load the required packages.
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(mlr3)
+library(SIAMCAT)
+```
+Load work space     
+```{r}
+path.in<-"/16S/R_analyses/RData/16S_Sinlge_5perc_log.RData" 
+path.out<-"~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/"  
+alg<-"ridge" 
+
+message(paste0("The RData object with the models you specified is ", path.in))
+message(paste0("Results will be saved in ", path.out))
+message(paste0("The ML alg you want ot use it ", alg))
+
+
+message(paste0("Loading ", path.in))
+load(path.in)
+algs<-c("lasso", "lassoll", "enet", "rf", "ridge", "ridge_ll")
+
+if(alg == "ridge"){
+  assign(alg, ridge_5x10)
+  mod<-ridge@siamcat
+} else if(alg == "lasso"){
+  assign(alg, lasso_5x10)
+  mod<-lasso@siamcat
+} else if(alg == "lassoll"){
+  assign(alg, lassoll_5x10)
+  mod<-lassoll@siamcat
+} else if(alg == "rf"){
+  assign(alg, rf_5x10)
+  mod<-rf@siamcat
+} else if(alg == "ridge_ll"){
+  assign(alg, ridge_ll_5x10)
+  mod<-ridge_ll@siamcat
+} else if(alg == "enet"){
+  assign(alg, enet_5x10)
+  mod<-enet@siamcat
+} else {stop(paste0("Algoritm should be one of: ", algs))}
+
+std<-names(mod)
+
+l.df.aucs<-vector(mode = "list",
+                  length = length(std))
+for(i in 1:length(std)){
+  # save study name
+  s<-std[i]
+  # save list of 10 iter of 1X10 CV
+  fit<-mod[[s]]
+  # extract aucs
+  l.df.aucs[[i]]<-data.frame(study = rep(s, 10),
+                             aucs = lapply(fit, function(x) x@eval_data$roc$auc %>% 
+                                                              as.double()) %>% 
+                                                              unlist,
+                             ML= rep(alg, 10))
+}
+df.aucs<-do.call(rbind, l.df.aucs)
+message("Saving df with the 10 AUCs (for the 10 1X10CV iterations)")
+saveRDS(df.aucs, file = paste0(path.out, "/AUCs.per1X10CV.", alg,".rds"))
+message("Averaging and saving df")
+df.aucs$AUC<-df.aucs$aucs*100
+df.mean<-df.aucs %>%
+            group_by(study) %>%
+            summarise(meanAUC = mean(AUC),
+                      std = sd(AUC))
+saveRDS(df.mean, file = paste0(path.out, "/AUCs.per1X10CV.mean.", alg,".rds"))
+
+```
+Load and process LOSO
+Load work space for the single study models    
+```{r}
+path.in<-"/16S/R_analyses/RDS/16S_loso.ridge.rds" 
+path.out<-"/16S/R_analyses/RDS/" 
+message(paste0("The RDS object with the models you specified is ", path.in))
+message(paste0("Results will be saved in ", path.out))
+
+
+message(paste0("Loading ", path.in))
+loso<-readRDS(path.in)
+
+std<-names(loso@siamca.test)
+
+l.df.aucs<-vector(mode = "list",
+                  length = length(std))
+for(i in 1:length(std)){
+  # save study name
+  s<-std[i]
+  # save list of 100 models
+  fit<-loso@siamca.test[[s]]
+  # extract aucs
+  l.df.aucs[[i]]<-data.frame(study = rep(s, 100),
+                             aucs = lapply(fit@eval_data$roc.all, function(x) as.double(x$auc)) %>%
+                               unlist(),
+                             ML= rep(alg, 10))
+}
+df.aucs<-do.call(rbind, l.df.aucs)
+message("Saving df with the 100 AUCs (for the 10X10CV iterations)")
+saveRDS(df.aucs, file = paste0(path.out, "/AUCs.per100mods.LOSO.", alg,".rds"))
+message("Averaging and saving df")
+df.aucs$AUC<-df.aucs$aucs*100
+df.mean<-df.aucs %>%
+            group_by(study) %>%
+            summarise(meanAUC = mean(AUC),
+                      std = sd(AUC))
+saveRDS(df.mean, file = paste0(path.out, "/AUCs.per100mods.mean.LOSO.", alg,".rds"))
+
+```

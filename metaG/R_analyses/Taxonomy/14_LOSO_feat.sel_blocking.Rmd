@@ -1,0 +1,88 @@
+---
+title: "LOSO feat Sel"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load packages
+```{r}
+library(phyloseq)
+library(dplyr)
+library(SIAMCAT)
+library(ggplot2)
+set.seed(345)
+```
+# Load meta
+```{r}
+all.tss<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+all.tss.store<-all.tss
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.form.rds")
+stopifnot(all(meta$SampleID == colnames(all.tss)))
+```
+
+# Load functions
+```{r}
+source("/Scripts/Pre_processing_functions/LOSO.r")
+source("/Scripts/Siamcat_wf.r")
+```
+
+# Perform feat selection
+```{r}
+min<-min(unique(as.vector(as.matrix(all.tss)))[unique(as.vector(as.matrix(all.tss))) != 0])/100
+study<-unique(as.character(meta$Study))
+
+feats.w20<-feats.20w.sel.block.ns(meta = meta,
+         microbiome = all.tss,
+         sd.min.q = 0.1,
+         log.n0 = min,
+         study.vector = study)
+saveRDS(feats.w20, file = "/metaG/R_analyses/Taxonomy/RDS/w20.bloking.rds")
+```
+
+## loso with top 20 for training
+```{r}
+# select only relevant feats
+all.tss.store<-all.tss
+rownames(meta)<-meta$SampleID
+meta<-meta[order(rownames(meta)),]
+stopifnot(all(rownames(meta) == names(all.tss.store)))
+
+l.loso.100.top20<-vector(mode = "list", length = 7)
+for(i in 1:length(l.loso.100.top20)){
+  # call study
+  study <- names(feats.w20@l.f)[i]
+  message("Process the LOSO tested on ", study)
+  names(l.loso.100.top20)[i]<-study
+  # call feats
+  message("---> extract features")
+  feats<-feats.w20@l.f[[i]]
+  # extract the correct motus names
+  message("---> extract mOUTs to subset data")
+  all.tss<-all.tss.store[feats,]
+  message("---> check feats were extracted correctly")
+  stopifnot(all(rownames(all.tss) == feats))
+
+  # LOSO is run once at the time for the Study left out in feat sel. 
+  # Results are then appended to a list.
+  message("Run loso on 20 best feats and testing on ", study)
+
+  loso<-loso.validation( vector.names = study, 
+                           df = all.tss, meta = meta, name.feat = "PD",
+                           filt.method = "pass", cutoff = 1e-07, trafo = "log.std", 
+                           log.n0 = min, n.fold = 10, 
+                           nsplit = 10, ml.method = "ridge", 
+                           name.study = NULL, dir = NULL, 
+                           max.show = 50, feat.type = "filtered", sd.add = 0.1, 
+                           raw.auc = F, plots = F,
+                           siamcat.holdout = NULL, param.set=NULL,
+                           study.label = "Study",
+                           case = "PD",
+                           n.p=2,
+                           norm.margin = 1) 
+  message("---> appening results to a list")
+  l.loso.100.top20[[i]]<-loso
+
+}
+saveRDS(l.loso.100.top20, "/metaG/R_analyses/Taxonomy/RDS/l.loso.100.top20.rds")
+```

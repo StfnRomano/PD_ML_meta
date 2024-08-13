@@ -1,0 +1,73 @@
+---
+title: "Combinatorics_LOSO"
+output: html_document
+---
+# Load packages
+```{r}
+library(phyloseq)
+library(dplyr)
+library(mlr3)
+library(SIAMCAT)
+require(mlr3extralearners)
+set.seed(2354)
+source("/Scripts/LOSO.r")
+```
+
+# Load data
+```{r}
+all.tss<-readRDS("all_no0_TSS_noUnassigned.rds")
+all.tss.store<-all.tss
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+stopifnot(all(names(all.tss) == meta$SampleID))
+
+meta$PD<-as.character(meta$PD)
+meta$Study<-as.character(meta$Study)
+meta$SampleID<-as.character(meta$SampleID)
+
+spec<-readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_5x10.rds")
+message("The dimension of the df before filtering is ", dim(all.tss)) 
+all.tss<-all.tss.store[spec,]
+message("The dimension of the df used to compute the models is ", dim(all.tss))
+
+# def min to add and format rownames meta
+min<-min(unique(as.vector(as.matrix(all.tss)))[unique(as.vector(as.matrix(all.tss))) != 0])/100
+rownames(meta)<-meta$SampleID 
+```
+
+# Run LOSOs
+```{r}
+study<-unique(as.character(meta$Study))
+for(i in 1:length(study)){
+  st<-study[i]
+  message("Running LOSO to test on ", st)
+  trains<-study[-1*which(study == st)]
+  test<-st
+  # Generate subsets of sizes 2 to 6 with unique items
+  all_subs_trains <- vector(mode = "list", length = 5)
+  for (i in 2:6) {
+    message("---> defining the subset with ", i, " studies.")
+    all_subs_trains[[i]] <- combn(trains, i, unique = TRUE)
+  }
+  # remove empty slot
+  all_subs_trains<-all_subs_trains[c(-1)]
+  names(all_subs_trains)<-c("Subset_2", "Subset_3", "Subset_4", "Subset_5", "Subset_6")
+  loso_ridge<-loso.combinatorics(list.combination = all_subs_trains, 
+                           test.name = test,  
+                           df = all.tss, meta = meta, 
+                           log.n0 = min) 
+  saveRDS(loso_ridge, file = paste0("/metaG/R_analyses/Taxonomy/RDS/loso_ridge.combinatorics.", st, ".rds"))
+  message("---> extract AUCs")
+  tmp<-loso_ridge@auc
+  # add the number of set combined
+  for(i in 1:length(tmp)){
+    tmp[[i]]$trainings<-rep(i+1, nrow(tmp[[i]]))
+  }
+  
+  aucs.comb<-do.call(rbind, tmp)
+  aucs.comb$n.samples<-as.numeric(aucs.comb$n.samples)
+  message("---> save AUCs")
+  saveRDS(aucs.comb,  paste0("/metaG/R_analyses/Taxonomy/RDS/loso_ridge.combinatorics.AUCs.", st, ".rds"))
+
+}
+
+```

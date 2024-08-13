@@ -1,0 +1,241 @@
+---
+title: "Coeff vs DA corr"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+Load data
+# motus
+```{r}
+library(ggplot2)
+library(dplyr)
+library(readxl)
+
+df.cross<-readRDS("/metaG//R_analyses/Taxonomy/RDS/df.DA.rds")
+df.pos.neg<-readRDS("/metaG//R_analyses/Taxonomy/RDS/Ridge_df.pos.neg.rds")
+
+# select only unique
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+# create a df
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(mc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "mOTUs",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+KOpath
+```{r}
+
+df.cross<-readRDS("/metaG//R_analyses/Functions/KOpath//RDS/df.DA.rds")
+df.pos.neg<-readRDS("/R_analyses/Functions/KOpath/RDS/Ridge_df.pos.neg.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+# create a df
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(kpc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "KEGG pathways",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+KOpath
+```{r}
+df.cross<-readRDS("/metaG//R_analyses/Functions/KO_modules///RDS/df.DA.rds")
+df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO_modules/RDS/Ridge_df.pos.neg.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(kmc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "KEGG modules",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+KO
+```{r}
+df.cross<-readRDS("/metaG//R_analyses/Functions/KO///RDS/df.DA.rds")
+df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+# here there are less KO in models becuse I selected them in the ML training. I need to subset
+df.cross<-df.cross[df.cross$bins %in% df.pos.neg$taxa,]
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(kc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "KEGG KO",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+GMM
+```{r}
+df.cross<-readRDS("/metaG//R_analyses/Functions/KO///RDS/df.DA.GMM.rds")
+df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.GMM.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(gmmc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "GMM",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+GBM
+```{r}
+df.cross<-readRDS("~/Documents/EMBL_ML_PD//metaG//R_analyses/Functions/KO///RDS/df.DA.GBM.rds")
+df.pos.neg<-readRDS("~/Documents/EMBL_ML_PD/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.GBM.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(gbmc<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "GBM",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+16S
+```{r}
+df.cross<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/df.DA.rds")
+df.pos.neg<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/Ridge_df.pos.neg.rds")
+
+df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
+dim(df.cross)
+df.cross<-df.cross[order(df.cross$bins),]
+dim(df.pos.neg)
+df.pos.neg<-df.pos.neg[order(df.pos.neg$taxa),]
+
+
+all(df.cross$bin == df.pos.neg$taxa)
+stopifnot(all(df.cross$bin == df.pos.neg$taxa))
+
+df.all<-data.frame(taxa = df.cross$bins,
+                   te.random = df.cross$TE.random,
+                   coeff = df.pos.neg$average)
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+
+(c16s<-ggplot(df.all, aes(te.random, -coeff)) +
+  geom_point() +
+  theme_bw() +
+  geom_smooth(method='lm') +
+  labs(title = "Genera [16S]",
+       subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
+                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+    xlab("Gen. Odds") +
+    ylab("Average relative Ridge weights"))
+```
+
+Combine the plots
+```{r}
+# Combine plots
+combined_plot <- cowplot::plot_grid(mc, c16s, kc, kpc, kmc, gmmc, gbmc,
+                                    ncol = 3)
+ggsave(plot = combined_plot, 
+       filename = "/metaG/R_analyses/Taxonomy/Figures/Coeff.Da.all.jpeg", 
+       width = 14, height = 10, device = "jpeg")
+```

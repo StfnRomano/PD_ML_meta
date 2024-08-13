@@ -1,0 +1,715 @@
+---
+title: "Fig violin"
+author: "SRomano"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load packages
+```{r}
+library(ggplot2)
+library(dplyr)
+library(Hmisc)
+
+```
+
+# metaG
+## Load dfs and format
+```{r}
+df_comb<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.comb.cv.scv.rds")
+df_comb<-subset(df_comb, ML == "ridge")
+
+ls.out<-readRDS("/metaG/R_analyses/Taxonomy/RDS/ls.out.cv.scv.rds")
+
+# create dfs with summary stats
+df.mean.stdv <-
+  df_comb %>%
+  group_by(method) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC))
+
+ls.mean.std <-
+  ls.out %>%
+  group_by(method) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC))
+
+df.points<-data.frame( study = c(subset(df_comb, method == "CV")$training.data, ls.out$study.out),
+                       AUC =  c(subset(df_comb, method == "CV")$AUC, ls.out$AUC),
+                       method =  c(subset(df_comb, method == "CV")$method, ls.out$method))
+```
+
+## t-tests
+```{r}
+df.scv<-df_comb[-1*c(1:7),]
+df.csv.m<-df.scv %>%
+  group_by(training.data) %>%
+  summarise(AUC = mean(AUC))
+
+# t-test compare CSV vs LOSO
+df.tt<-data.frame(AUC = c(ls.out$AUC, df.csv.m$AUC),
+                  method = as.factor(c(rep("LOSO", 7), rep("CSV", 7))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+# t-test compare CSV vs CV
+df.tt<-data.frame(AUC = c(df.csv$AUC, subset(df_comb, method == "CV")$AUC),
+                  method = as.factor(c(rep("CSV", 42), rep("CV", 7))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+
+```
+
+# Check relationship between AUCs and number of samples
+```{r}
+meta.m<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+sampl<-meta.m %>%
+  group_by(Study) %>%
+  summarise(n = n())
+
+# CSV
+# test associations
+df.csv.m<-left_join(df.csv, sampl, by = c("training.data" = "Study"))
+cor.test(df.csv.m$AUC, df.csv.m$n, method=c("pearson"))
+
+#################
+# Corre tests
+#################
+# LOSO
+cor.test(ls.out$AUC, ls.out$n.samples, method=c("pearson"))
+# CV
+df.cv<-subset(df_comb, method == "CV") %>%
+  left_join(sampl, by = c("training.data" = "Study")) 
+cor.test(df.cv$AUC, df.cv$n, method=c("pearson"))
+
+nb.cols <- 24
+mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
+
+# do a single plot
+(smg.dot<-df_comb %>%
+  group_by(method, training.data) %>%
+  summarise(med = median(AUC),
+            min = min(AUC),
+            max = max(AUC)) %>%
+  left_join(sampl, by = c("training.data" = "Study")) %>%
+  ggplot() +
+    geom_errorbar(mapping = aes(x = as.factor(n), 
+                                ymin = min, ymax = max, 
+                                color = training.data), width = 0, size = 1) +
+    geom_point(aes(x = as.factor(n), y = med, 
+                   shape = method, 
+                   color = training.data), size = 5) +
+  scale_color_manual(values = mycolors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        axis.text.y = element_blank(),
+        axis.text.x  = element_text(size = 14),
+        axis.ticks.y = element_blank(),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16)) +
+  ylim(c(20, 95)) +
+  labs(color = "Training data - SMG",
+       shape = "Validation\nmethod"))
+  
+  
+```
+## Plots
+```{r}
+# create a df to plot mean and stdv
+df.mean.std.csv <- subset(df_comb, method == "CSV") %>% 
+  group_by(testing.data ) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC),
+            min = min(AUC),
+            max = max(AUC))
+
+
+(p<- 
+    ggplot() + 
+    # add shading of the stdev 
+    geom_rect(mapping =
+                 aes(ymin =
+                        subset(df.mean.stdv, method == "CV")$mean - subset(df.mean.stdv, method == "CV")$stdev,
+                      ymax =
+                        subset(df.mean.stdv, method == "CV")$mean + subset(df.mean.stdv, method == "CV")$stdev,
+                      xmin = -Inf, xmax = Inf),
+                fill = "#0072B2", alpha = 0.2) +
+
+   geom_rect(mapping = aes(ymin = ls.mean.std$mean - ls.mean.std$stdev,
+                           ymax = ls.mean.std$mean + ls.mean.std$stdev,
+                           xmin = -Inf, xmax = Inf),
+             fill = "#FFED00", alpha = 0.2)  +
+   # add lines for average
+      geom_hline(yintercept =
+                   subset(df.mean.stdv, method == "CV")$mean,
+                 linetype = "solid",
+                 linewidth = .9,
+                 color = "#0072B2")+
+    geom_hline(yintercept = ls.mean.std$mean,
+               linetype = "solid",
+               linewidth = .9,
+               color = "#FFED00")+
+
+    # add violins
+    geom_violin(data = subset(df_comb, method == "CSV"),
+                mapping = aes(x = testing.data, y = AUC), 
+                fill ="white",
+                color = "black",
+                trim = T,
+                size = 0.75) +
+    # add error bar with margin
+    geom_errorbar(data = df.mean.std.csv,
+                  mapping = aes(x = testing.data,
+                                ymin = mean - stdev, ymax = mean + stdev), 
+                  width = 0,  color = "black", size = 1.5,
+                  position = position_dodge(width = 0.9)) +
+
+    geom_errorbar(data = df.mean.std.csv,
+                  mapping = aes(x = testing.data,
+                                ymin = mean - stdev, ymax = mean + stdev), 
+                  width = 0,  color = "darkgray", size = 1.25,
+                  position = position_dodge(width = 0.9)) +
+      # add stats summaries
+    geom_point(data = df.mean.std.csv, 
+               mapping = aes(testing.data, 
+                           mean),
+               pch = 21,
+               fill = "darkgray",
+               size = 5) +
+ 
+    # add points
+    geom_point(data = df.points, 
+               mapping = aes(study, 
+                           AUC, 
+                           shape = method), 
+               size = 5,
+               color = "black",
+               position = position_dodge2(width = 0.5)) +
+
+    geom_point(data = df.points, 
+               mapping = aes(study, 
+                           AUC, 
+                           shape = method,
+                           color = method), 
+               size = 4,
+               position = position_dodge2(width = 0.5)) +
+
+
+  # adjust colors and theme
+  
+  scale_color_manual(values = c("#0072B2","#FFED00")) +
+  geom_hline(yintercept=50, 
+             linetype="dashed", 
+             color = "#757373", size=1) +
+  theme_bw() +
+  scale_y_continuous(breaks = seq(20, 95, by = 5), limits =c(20,95)) +
+  # labs(title = "Metagenomics data") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size =18),
+        axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        legend.position =c(0.85, 0.08),
+        legend.background = element_blank(),
+        legend.title=element_blank(),
+        panel.grid = element_blank(),
+        legend.text = element_text(size = 12)) +
+    xlab("Study"))
+```
+
+
+# 16S
+## Load dfs and format
+```{r}
+
+df_comb16<-readRDS("/16S/R_analyses/RDS/df.comb.cv.scv.rds")
+df_comb16<-subset(df_comb16, ML == "ridge")
+ls.out16<-readRDS("/16S/R_analyses/RDS/ls.out.cv.scv.rds")
+
+# Need to re-add the dates
+df_comb16$testing.data[df_comb16$testing.data == "Aho"]<-"Aho_2019"
+df_comb16$testing.data[df_comb16$testing.data == "Petrov"]<-"Petrov_2017"
+df_comb16$testing.data[df_comb16$testing.data == "Keshavarzian"]<-"Keshavarzian_2015"
+df_comb16$testing.data[df_comb16$testing.data == "Zhang"]<-"Zhang_2020"
+df_comb16$testing.data[df_comb16$testing.data == "Nishiwaki"]<-"Nishiwaki_2020"
+df_comb16$testing.data[df_comb16$testing.data == "Hopfner"]<-"Hopfner_2017"
+df_comb16$testing.data[df_comb16$testing.data == "Weis"]<-"Weis_2019"
+df_comb16$testing.data[df_comb16$testing.data == "Cirstea"]<-"Cirstea_2020"
+df_comb16$testing.data[df_comb16$testing.data == "Tan"]<-"Tan_2021"
+df_comb16$testing.data[df_comb16$testing.data == "Kenna"]<-"Kenna_2021"
+df_comb16$testing.data[df_comb16$testing.data == "Wallen251"]<-"Wallen251_2021"
+df_comb16$testing.data[df_comb16$testing.data == "Wallen151"]<-"Wallen151_2021"
+df_comb16$testing.data[df_comb16$testing.data == "Jo"]<-"Jo_2022"
+df_comb16$testing.data[df_comb16$testing.data == "Lubomski"]<-"Lubomski_2022"
+df_comb16$testing.data[df_comb16$testing.data == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+df_comb16$testing.data[df_comb16$testing.data == "Qian"]<-"Qian_2018"
+df_comb16$testing.data[df_comb16$testing.data == "Pietrucci"]<-"Pietrucci_2019"
+
+# Add date for loso
+ls.out16$study.out[ls.out16$study.out == "Aho"]<-"Aho_2019"
+ls.out16$study.out[ls.out16$study.out == "Petrov"]<-"Petrov_2017"
+ls.out16$study.out[ls.out16$study.out == "Keshavarzian"]<-"Keshavarzian_2015"
+ls.out16$study.out[ls.out16$study.out == "Zhang"]<-"Zhang_2020"
+ls.out16$study.out[ls.out16$study.out == "Nishiwaki"]<-"Nishiwaki_2020"
+ls.out16$study.out[ls.out16$study.out == "Hopfner"]<-"Hopfner_2017"
+ls.out16$study.out[ls.out16$study.out == "Weis"]<-"Weis_2019"
+ls.out16$study.out[ls.out16$study.out == "Cirstea"]<-"Cirstea_2020"
+ls.out16$study.out[ls.out16$study.out == "Tan"]<-"Tan_2021"
+ls.out16$study.out[ls.out16$study.out == "Kenna"]<-"Kenna_2021"
+ls.out16$study.out[ls.out16$study.out == "Wallen251"]<-"Wallen251_2021"
+ls.out16$study.out[ls.out16$study.out == "Wallen151"]<-"Wallen151_2021"
+ls.out16$study.out[ls.out16$study.out == "Jo"]<-"Jo_2022"
+ls.out16$study.out[ls.out16$study.out == "Lubomski"]<-"Lubomski_2022"
+ls.out16$study.out[ls.out16$study.out == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+ls.out16$study.out[ls.out16$study.out == "Qian"]<-"Qian_2018"
+ls.out16$study.out[ls.out16$study.out == "Pietrucci"]<-"Pietrucci_2019"
+
+
+# create dfs with summary stats
+df.mean.stdv16 <-
+  df_comb16 %>%
+  group_by(method) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC))
+
+ls.mean.std16 <-
+  ls.out16 %>%
+  group_by(method) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC))
+
+df.points16<-data.frame( study = c(subset(df_comb16, method == "CV")$training.data, ls.out16$study.out),
+                       AUC =  c(subset(df_comb16, method == "CV")$AUC, ls.out16$AUC),
+                       method =  c(subset(df_comb16, method == "CV")$method, ls.out16$method))
+```
+
+## t-test
+```{r}
+df.csv<-subset(df_comb16, method == "CSV")
+
+# t-test compare CSV vs CV
+df.tt<-data.frame(AUC = c(df.csv$AUC, subset(df_comb16, method == "CV")$AUC),
+                  method = as.factor(c(rep("CSV", 272), rep("CV", 17))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+
+# t-test compare CSV vs LOSO
+df.tt<-data.frame(AUC = c(ls.out16$AUC, subset(df_comb16, method == "CSV")$AUC),
+                  method = as.factor(c(rep("LOSO", 17), rep("CSV", nrow(subset(df_comb16, method == "CSV"))))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+
+# t-tes welch comparing CSV 16S and SMG 
+df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CSV")$AUC ,
+                          subset(df_comb, method == "CSV")$AUC),
+                  method = as.factor(c(rep("16S", 272), 
+                                       rep("SMG", 42))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+
+# t-tes welch comparing LOSO 16S and SMG 
+df.tt<-data.frame(AUC = c(ls.out16$AUC, ls.out$AUC),
+                  method = as.factor(c(rep("16S", 17), 
+                                       rep("SMG", 7))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+
+# t-tes welch comparing CV 16S and SMG 
+df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CV")$AUC ,
+                          subset(df_comb, method == "CV")$AUC),
+                  method = as.factor(c(rep("16S", 17), 
+                                       rep("SMG", 7))))
+t.test(AUC ~ method, data = df.tt, var.equal = F)
+```
+
+
+# Check relationship between CSV and number of samples
+```{r}
+meta.m<-readRDS("~/Documents/EMBL_ML_PD/16S//R_analyses/RDS/meta.rds")
+meta.m$Study_2<-as.character(meta.m$Study_2)
+# rename samples
+
+meta.m$Study_2[meta.m$Study_2 == "Aho"]<-"Aho_2019"
+meta.m$Study_2[meta.m$Study_2 == "Petrov"]<-"Petrov_2017"
+meta.m$Study_2[meta.m$Study_2 == "Keshavarzian"]<-"Keshavarzian_2015"
+meta.m$Study_2[meta.m$Study_2 == "Zhang"]<-"Zhang_2020"
+meta.m$Study_2[meta.m$Study_2 == "Nishiwaki"]<-"Nishiwaki_2020"
+meta.m$Study_2[meta.m$Study_2 == "Hopfner"]<-"Hopfner_2017"
+meta.m$Study_2[meta.m$Study_2 == "Weis"]<-"Weis_2019"
+meta.m$Study_2[meta.m$Study_2 == "Cirstea"]<-"Cirstea_2020"
+meta.m$Study_2[meta.m$Study_2 == "Tan"]<-"Tan_2021"
+meta.m$Study_2[meta.m$Study_2 == "Kenna"]<-"Kenna_2021"
+meta.m$Study_2[meta.m$Study_2 == "Wallen251"]<-"Wallen251_2021"
+meta.m$Study_2[meta.m$Study_2 == "Wallen151"]<-"Wallen151_2021"
+meta.m$Study_2[meta.m$Study_2 == "Jo"]<-"Jo_2022"
+meta.m$Study_2[meta.m$Study_2 == "Lubomski"]<-"Lubomski_2022"
+meta.m$Study_2[meta.m$Study_2 == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+meta.m$Study_2[meta.m$Study_2 == "Qian"]<-"Qian_2018"
+meta.m$Study_2[meta.m$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
+#
+
+sampl<-meta.m %>%
+  group_by(Study_2) %>%
+  summarise(n = n())
+
+# CSV
+left_join(df.csv, sampl, by = c("training.data" = "Study_2")) %>%
+  ggplot(aes(reorder(training.data, n), AUC)) +
+  geom_boxplot() +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90)) +
+  labs(title = "AUC-CSV values sorted by sample size of training set") +
+  xlab("training set") +
+  xlab("AUC-CSV") 
+  
+left_join(df.csv, sampl, by = c("training.data" = "Study_2")) %>%
+  ggplot(aes(n, AUC)) +
+    geom_point() +
+    geom_smooth(method='lm', formula= y~x)  +
+    labs(title = "AUC-CSV values vs sample size of training set (16S)",
+         subtitle = "No significant association AUC-n (see caption)",
+         caption = "lm(AUC-CSV ~ n) -> n p-value 0.23") +
+  xlab("training set size") +
+  xlab("AUC-CSV") 
+
+# test associations
+df.csv.m<-left_join(df.csv, sampl, by = c("training.data" = "Study_2"))
+cor.test(df.csv.m$AUC, df.csv.m$n, method=c("pearson"))
+
+# LOSO
+cor.test(ls.out16$AUC, ls.out16$n.samples, method=c("pearson"))
+
+# CV
+df.cv<-subset(df_comb16, method == "CV") %>%
+  left_join(sampl, by = c("training.data" = "Study_2")) 
+cor.test(df.cv$AUC, df.cv$n, method=c("pearson"))
+
+(s16.dot<-df_comb16 %>%
+  group_by(method, training.data) %>%
+  summarise(med = median(AUC),
+            min = min(AUC),
+            max = max(AUC)) %>%
+  left_join(sampl, by = c("training.data" = "Study_2")) %>%
+  ggplot() +
+    geom_errorbar(mapping = aes(x = as.factor(n), 
+                                ymin = min, ymax = max, 
+                                color = training.data), 
+                  width = 0, size = 1) +
+    geom_point(aes(x = as.factor(n), y = med, 
+                   shape = method, 
+                   color = training.data), size = 5) +
+  scale_color_manual(values = mycolors) +
+  theme_bw() +
+  theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16)) +
+  xlab("Number of samples of each dataset") +
+  ylab("AUC") +
+  ylim(c(20, 95)) +
+  labs(color = "Training data - 16S",
+       shape = "Validation\nmethod"))
+```
+
+Combine the two plots
+```{r}
+(gg<-ggpubr::ggarrange(plotlist = list(s16.dot, smg.dot), 
+                       align = "hv", 
+                       widths = c(2,1.2),
+                       labels = "auto", 
+                       label.x = c(0.05,0.1),
+                       label.y = c(0.98, 0.98), 
+                       font.label = list(size =21)))
+
+ggsave("/16S/R_analyses/Figures/Size_CVSCV.svg", gg, device = "svg", width = 16, height = 6)
+
+
+```
+
+
+## Plot
+```{r}
+# create a df to plot mean and stdv
+df.mean.std.csv16 <- subset(df_comb16, method == "CSV") %>% 
+  group_by(testing.data ) %>%
+  summarise(mean = mean(AUC),
+            stdev = sd(AUC),
+            min = min(AUC),
+            max = max(AUC))
+
+
+(p16<- 
+    ggplot() + 
+    # add shading of the stdev 
+    geom_rect(mapping =
+                  aes(ymin =
+                        subset(df.mean.stdv16, method == "CV")$mean - subset(df.mean.stdv16, method == "CV")$stdev,
+                      ymax =
+                        subset(df.mean.stdv16, method == "CV")$mean + subset(df.mean.stdv16, method == "CV")$stdev,
+                      xmin = -Inf, xmax = Inf),
+                fill = "#0072B2", alpha = 0.2) +
+
+    geom_rect(mapping = aes(ymin = ls.mean.std16$mean - ls.mean.std16$stdev,
+                            ymax = ls.mean.std16$mean + ls.mean.std16$stdev,
+                            xmin = -Inf, xmax = Inf),
+              fill = "#FFED00", alpha = 0.2)  +
+    # add lines for average
+      geom_hline(yintercept =
+                   subset(df.mean.stdv16, method == "CV")$mean,
+                 linetype = "solid",
+                 linewidth = .9,
+                 color = "#0072B2")+
+    geom_hline(yintercept = ls.mean.std16$mean,
+               linetype = "solid",
+               linewidth = .9,
+               color = "#FFED00")+
+  
+  # add violins
+  geom_violin(data = subset(df_comb16, method == "CSV"),
+              mapping = aes(x = testing.data, y = AUC),
+              fill ="white",
+              color = "black",
+              trim = T,
+              size = 0.75) +
+    # add error bar with margin
+    geom_errorbar(data = df.mean.std.csv16,
+                  mapping = aes(x = testing.data,
+                                ymin = mean - stdev, ymax = mean + stdev), 
+                  width = 0,  color = "black", size = 1.5,
+                  position = position_dodge(width = 0.9)) +
+
+    geom_errorbar(data = df.mean.std.csv16,
+                  mapping = aes(x = testing.data,
+                                ymin = mean - stdev, ymax = mean + stdev), 
+                  width = 0,  color = "darkgray", size = 1.25,
+                  position = position_dodge(width = 0.9)) +
+      # add stats summaries
+    geom_point(data = df.mean.std.csv16, 
+               mapping = aes(testing.data, 
+                           mean),
+               pch = 21,
+               fill = "darkgray",
+               size = 5) +
+
+    # add points
+    geom_point(data = df.points16, 
+               mapping = aes(study, 
+                           AUC, 
+                           shape = method), 
+               size = 5,
+               color = "black",
+               position = position_dodge2(width = 0.5)) +
+
+    geom_point(data = df.points16, 
+               mapping = aes(study, 
+                           AUC, 
+                           shape = method,
+                           color = method), 
+               size = 4,
+               position = position_dodge2(width = 0.5)) +
+
+
+  # adjust colors and theme
+  
+  scale_color_manual(values = c("#0072B2","#FFED00")) +
+  geom_hline(yintercept=50, 
+             linetype="dashed", 
+             color = "#757373", size=1) +
+  theme_bw() +
+  scale_y_continuous(breaks = seq(20, 95, by = 5), limits =c(20,95)) +
+  # labs(title = "16S amplicon data") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size =18),
+        title = element_text(size =16),
+        axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+        legend.position =c(0.9, 0.08),
+        legend.background = element_blank(),
+        legend.title=element_blank(),
+        panel.grid = element_blank(),
+        legend.text = element_text(size= 12)) +
+    xlab("Study"))
+
+```
+
+# make a t-test for the CV 16S vs metaG
+```{r}
+
+df.cv<-data.frame(AUC = c(subset(df_comb, method == "CV")$AUC, subset(df_comb16, method == "CV")$AUC),
+                  seq = c(rep("smg", 7), rep("16S", 17)) )
+
+t.test(AUC ~ seq, data = df.cv, var.equal = F)
+
+```
+# Combine two plots
+```{r}
+
+(gg<-ggpubr::ggarrange(plotlist = list(p16, p), 
+                       align = "hv", 
+                       widths = c(2.5,1),
+                       labels = "auto", 
+                       label.x = c(0.05,0.1),
+                       label.y = c(0.98, 0.98), 
+                       font.label = list(size =18)))
+
+ggsave("/16S/R_analyses/Figures/Fig_2_violinCSV.svg", gg, device = "svg", width = 14, height = 6)
+
+```
+Plot the dots+StDev for CV and LOSO
+```{r}
+# metaG
+all.std<-readRDS("/metaG/R_analyses/Taxonomy/RDS/AUCs.per1X10CV.mean.ridge.rds")
+all.std$method <- rep("CV", length = nrow(all.std))
+loso.std<-readRDS("/metaG/R_analyses/Taxonomy/RDS/AUCs.per100mods.mean.LOSO.ridge.rds")
+loso.std$method <- rep("LOSO", length = nrow(loso.std))
+
+df.all.loso.smg<-rbind.data.frame(all.std, loso.std)
+df.all.loso.smg$method<-factor(df.all.loso.smg$method, levels = c("CV", "LOSO"))
+df.all.loso.smg$study<-as.factor(df.all.loso.smg$study)
+df.all.loso.smg$seq<-rep("SMG", nrow(df.all.loso.smg))
+# combine and plot
+(smg<-ggplot(df.all.loso.smg) +
+    # add error bar with margin
+    geom_errorbar(mapping = aes(x = study,
+                                ymin = meanAUC - std, 
+                                ymax = meanAUC + std, 
+                                group = method), 
+                  width = 0.3,  color = "black", size = 1.55,
+                  position = position_dodge(width = 0.5),
+                  show.legend = F) +
+
+    geom_errorbar(mapping = aes(x = study,
+                                ymin = meanAUC - std, 
+                                ymax = meanAUC + std,
+                                color = method), 
+                  width = 0.25,  size = 1.25,
+                  position = position_dodge(width = 0.5),
+                  show.legend = F) +
+    # add points
+    geom_point(mapping = aes(study, 
+                           meanAUC, 
+                           shape = method), 
+               size = 5,
+               color = "black",
+               position = position_dodge2(width = 0.5)) +
+
+    geom_point(mapping = aes(study, 
+                           meanAUC, 
+                           shape = method,
+                           color = method), 
+               size = 4,
+               position = position_dodge2(width = 0.5)) +
+
+  # adjust colors and theme
+  
+  scale_color_manual(values = c("#0072B2","#FFED00")) +
+  geom_hline(yintercept=50, 
+             linetype="dashed", 
+             color = "#757373", size=1) +
+  theme_bw() +
+  scale_y_continuous(breaks = seq(40, 95, by = 5), limits =c(40,95)) +
+  # labs(title = "16S amplicon data") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size =18),
+        title = element_text(size =16),
+        axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+        axis.text.y = element_blank(),
+        axis.title.y = element_blank(),
+        axis.ticks.y = element_blank(), 
+        legend.position =c(0.9, 0.08),
+        legend.background = element_blank(),
+        legend.title=element_blank(),
+        panel.grid = element_blank(),
+        legend.text = element_text(size =12)) +
+  xlab("Study"))
+
+# 16S
+all.std<-readRDS("/16S//R_analyses/RDS/AUCs.per1X10CV.mean.ridge.rds")
+all.std$method <- rep("CV", length = nrow(all.std))
+loso.std<-readRDS("/16S/R_analyses/RDS/AUCs.per100mods.mean.LOSO.ridge.rds")
+loso.std$method <- rep("LOSO", length = nrow(loso.std))
+
+
+df.all.loso<-rbind.data.frame(all.std, loso.std)
+df.all.loso$method<-factor(df.all.loso$method, levels = c("CV", "LOSO"))
+
+df.all.loso$study[df.all.loso$study == "Aho"]<-"Aho_2019"
+df.all.loso$study[df.all.loso$study == "Petrov"]<-"Petrov_2017"
+df.all.loso$study[df.all.loso$study == "Keshavarzian"]<-"Keshavarzian_2015"
+df.all.loso$study[df.all.loso$study == "Zhang"]<-"Zhang_2020"
+df.all.loso$study[df.all.loso$study == "Nishiwaki"]<-"Nishiwaki_2020"
+df.all.loso$study[df.all.loso$study == "Hopfner"]<-"Hopfner_2017"
+df.all.loso$study[df.all.loso$study == "Weis"]<-"Weis_2019"
+df.all.loso$study[df.all.loso$study == "Cirstea"]<-"Cirstea_2020"
+df.all.loso$study[df.all.loso$study == "Tan"]<-"Tan_2021"
+df.all.loso$study[df.all.loso$study == "Kenna"]<-"Kenna_2021"
+df.all.loso$study[df.all.loso$study == "Wallen251"]<-"Wallen251_2021"
+df.all.loso$study[df.all.loso$study == "Wallen151"]<-"Wallen151_2021"
+df.all.loso$study[df.all.loso$study == "Jo"]<-"Jo_2022"
+df.all.loso$study[df.all.loso$study == "Lubomski"]<-"Lubomski_2022"
+df.all.loso$study[df.all.loso$study == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
+df.all.loso$study[df.all.loso$study == "Qian"]<-"Qian_2018"
+df.all.loso$study[df.all.loso$study == "Pietrucci"]<-"Pietrucci_2019"
+df.all.loso$seq<-rep("16S", nrow(df.all.loso))
+
+(g16S<-ggplot(df.all.loso) +
+    # add error bar with margin
+    geom_errorbar(mapping = aes(x = study,
+                                ymin = meanAUC - std, 
+                                ymax = meanAUC + std, 
+                                group = method), 
+                  width = 0.3,  color = "black", size = 1.55,
+                  position = position_dodge(width = 0.5),
+                  show.legend = F) +
+
+    geom_errorbar(mapping = aes(x = study,
+                                ymin = meanAUC - std, 
+                                ymax = meanAUC + std,
+                                color = method), 
+                  width = 0.25,  size = 1.25,
+                  position = position_dodge(width = 0.5),
+                  show.legend = F) +
+    # add points
+    geom_point(mapping = aes(study, 
+                           meanAUC, 
+                           shape = method), 
+               size = 5,
+               color = "black",
+               position = position_dodge2(width = 0.5)) +
+
+    geom_point(mapping = aes(study, 
+                           meanAUC, 
+                           shape = method,
+                           color = method), 
+               size = 4,
+               position = position_dodge2(width = 0.5)) +
+
+  # adjust colors and theme
+  
+  scale_color_manual(values = c("#0072B2","#FFED00")) +
+  geom_hline(yintercept=50, 
+             linetype="dashed", 
+             color = "#757373", size=1) +
+  theme_bw() +
+  scale_y_continuous(breaks = seq(40, 95, by = 5), limits =c(40,95)) +
+  # labs(title = "16S amplicon data") +
+  theme(axis.text = element_text(size = 14),
+        axis.title = element_text(size =18),
+        title = element_text(size =16),
+        axis.text.x = element_text(angle = 30, vjust = 1, hjust = 1),
+        legend.position =c(0.9, 0.08),
+        legend.background = element_blank(),
+        legend.title=element_blank(),
+        panel.grid = element_blank(),
+        legend.text = element_text(size =12)) +
+  xlab("Study"))
+
+
+(gg<-ggpubr::ggarrange(plotlist = list(g16S, smg), 
+                       align = "hv", 
+                       widths = c(2.5,1),
+                       labels = "auto", 
+                       label.x = c(0.05,0.1),
+                       label.y = c(0.98, 0.98), 
+                       font.label = list(size =18)))
+
+ggsave("/16S/R_analyses/Figures/CSV_violin_STDEV.svg", gg, device = "svg", width = 14, height = 6)
+
+
+```

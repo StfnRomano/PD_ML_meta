@@ -1,0 +1,166 @@
+---
+title: "LOSO feat sel Fig"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+# Load packages
+```{r}
+library(phyloseq)
+library(dplyr)
+library(SIAMCAT)
+library(ggplot2)
+set.seed(345)
+```
+
+# Load results
+```{r}
+# load feats
+feats.w20<-readRDS(file = "/metaG/R_analyses/Taxonomy/RDS/w20.bloking.rds")
+
+# load reduced model
+l.loso.100.top20<-readRDS( "/metaG/R_analyses/Taxonomy/RDS/l.loso.100.top20.rds")
+loso.top20<-do.call(rbind, lapply(l.loso.100.top20, function(x) x@auc))
+loso.top20$Model.type <-rep("Reduced [average AUC 72.3]")
+# load full model
+loso.full<-readRDS("/metaG/R_analyses/Taxonomy/RDS/All_metaG_loso_ridge.rds")
+loso.full<-data.frame(loso.full@auc, 
+                      Model.type = rep("Full [average AUC 72.4]", nrow(loso.full@auc)))
+
+df.all.auc<-rbind.data.frame(loso.top20, loso.full)
+df.all.auc.mm<-df.all.auc %>%
+  group_by(study.out) %>%
+  summarise(min = min(AUC),
+            max = max(AUC))
+
+df.all.auc %>%
+  group_by(Model.type) %>%
+  summarise(mean = mean(AUC))
+```
+
+# Make aplot
+```{r}
+# make plot with AUCs
+(ga<-ggplot(df.all.auc, aes(study.out, AUC*100)) +
+      geom_errorbar(data = df.all.auc.mm,
+                  inherit.aes = F,
+                  mapping = aes(x = study.out,
+                              ymin = min*100,
+                              ymax = max*100), width = 0, color = "darkgray", linewidth = 1.5) +
+  geom_point(mapping = aes(shape = Model.type), size = 5, fill = "black") +
+  geom_point(mapping = aes(shape = Model.type), size = 4, color = "#FFED00") +
+  scale_y_continuous(limits = c(55,85), breaks = seq(65,85, by = 10))  +
+  theme_bw()  +
+  theme(axis.text.x = element_text(angle = 90, size = 14, vjust = 1, hjust = 1),
+        panel.grid = element_blank(),
+        axis.text.y = element_text(size = 14),
+        axis.title = element_text(size =16),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16),
+        legend.position = c(0.45, 0.1),
+        legend.background = element_blank()) +
+    xlab("Test set") +
+    ylab("AUC") +
+    labs(shape= "Model type"))
+
+# extract weights
+l.weights<-vector(mode = "list", length = length(l.loso.100.top20))
+for(i in 1:length(l.loso.100.top20)){
+  print(names(l.loso.100.top20)[i])
+  std<-names(l.loso.100.top20)[i]
+  tmp<-feature_weights(l.loso.100.top20[[i]]@siamcat.train[[1]])# remember this is a list of length 1, so we take just first entry
+  tmp$Study.out <-rep(std, nrow(tmp))
+  l.weights[[i]]<-tmp
+  names(l.weights)[i]<-std
+
+}
+
+# select relative average weights and stdv
+l.weights.mean<-lapply(l.weights, function(x) x[, c("mean.rel.weight", "sd.rel.weight", "Study.out")])
+for(i in 1:length(l.weights.mean)){
+  l.weights.mean[[i]]$mOTUs<-rownames(l.weights.mean[[i]])
+}
+# merge everything and format names
+df.weight<-do.call(rbind, l.weights.mean)
+df.weight$shortn<-gsub("Family .* sp.", "sp.",gsub("species .*\\[", "sp.\\[", df.weight$mOTUs))
+df.weight$shortn<-gsub("\\[.*_v3_", "[", df.weight$shortn)
+
+# order the taxa
+tmp.weights<-df.weight %>%
+  group_by(shortn) %>%
+  summarise(n = n(),
+            average = mean(mean.rel.weight) )
+tmp.weights$average<--1*tmp.weights$average
+(x<-tmp.weights[order(tmp.weights$n,tmp.weights$average,decreasing = T),])
+ids<-tmp.weights[order(tmp.weights$n,tmp.weights$average,decreasing = T),]$shortn %>%
+  rev()
+
+
+df.weight$shortn<-factor(df.weight$shortn, levels = ids, ordered = T)
+
+# make a plot
+# change the direction of the coeff
+df.weight$mean.rel.weight<-df.weight$mean.rel.weight*-1
+df.weight$Disc<-ifelse(df.weight$mean.rel.weight < 0, "CTR", "PD")
+
+
+# Check whether taxa have the same enrichment direction in all training sets.
+df.weight %>%
+  group_by(shortn) %>%
+  distinct(Disc) %>%
+  nrow()
+
+tmo.df.feats<-do.call(rbind, feats.w20@l.df)
+for(i in unique(df.weight$mOTUs)){
+  print(i)
+  x<-subset(tmo.df.feats, motus == i)
+  print(x)
+  if(all(x$w > 0)){
+    df.weight[df.weight$mOTUs == i,]$Disc<-"CTR enriched"
+    message("For motus i the W are all positive")
+  } else if(all(x$w < 0)){
+    df.weight[df.weight$mOTUs == i,]$Disc<-"PD enriched"
+    message("For motus i the W are all negative")
+    }  else {message("For motus i the W are differnet Sign")
+  }
+}
+df.weight %>%
+  group_by(shortn) %>%
+  distinct(Disc) %>%
+  nrow()
+
+df.weight$Disc<-factor(df.weight$Disc, levels = c("PD enriched", "CTR enriched"), ordered = T)
+
+# plot
+(mat<-ggplot(df.weight, aes(Study.out, shortn)) +
+    geom_tile(mapping = aes(fill = mean.rel.weight)) +
+  theme_bw() +
+  scale_y_discrete(position = "right") +
+  theme(axis.title = element_text(size = 16),
+        axis.text.x = element_text(angle = 90, size = 14, vjust = 1, hjust = 1),
+        axis.text.y = element_text(size = 14),
+        panel.grid = element_blank(),
+        legend.position="bottom",
+        strip.text = element_text(size=12),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size =14)) +
+  scale_fill_gradientn(limits = c(-0.10,0.15), breaks = c(-0.1, 0, 0.15),
+                        colours=c("#3e3e52", "#525266", 
+                                  "#FFF4A4", "#ff6666", "#f55c5c")) +
+    facet_grid(rows = vars(Disc),scales = "free", space = "free", ) +
+  xlab("Test set") +
+  ylab("Species")+
+    labs(fill = "Mean relative \nweights"))
+
+gg<-cowplot::plot_grid(ga, mat, 
+                   rel_widths = c(1.25,2.5),
+                   labels = "auto", 
+                   label_size = 18,
+                   label_x = c(-0.01, -0.019), align = "h", axis = "b")
+gg
+
+ggsave(gg, 
+       file = "/metaG/R_analyses/Taxonomy/Figures/single.auc.bloking.100mods.heat.svg", 
+       width = 12, height = 12)
+```
