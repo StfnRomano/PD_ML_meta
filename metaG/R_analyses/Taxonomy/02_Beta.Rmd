@@ -66,46 +66,15 @@ all_bc<-phyloseq::distance(all_phylo, method = "bray", square = T)
 #####################################
 # Compare within vs between distances
 #####################################
-
-# extract distances between samples within the same group
-
-same_study_distances <- function(dist_matrix, meta) {
-  study_dist_list <- list()
-  unique_studies <- unique(meta$Study)
-  for (study_id in unique_studies) {
-    study_samples <- subset(meta, Study == study_id)$SampleID
-    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples)
-    stopifnot(all(colnames(all_bc)[study_indices] == rownames(all_bc)[study_indices]))
-
-    study_distances <- as.matrix(dist_matrix)[study_indices, study_indices]
-    study_dist_list[[as.character(study_id)]] <- study_distances
-  }
-  return(study_dist_list)
-}
-
-# extract distances between samples in different groups
-different_study_distances <- function(dist_matrix, meta) {
-  study_dist_list <- list()
-  unique_studies <- unique(meta$Study)
-  for (study_id in unique_studies) {
-    study_samples <- subset(meta, Study == study_id)$SampleID 
-    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples) # this is a square matrix
-    other_indices <- which(!(colnames(as.matrix(dist_matrix)) %in% study_samples))
-    stopifnot(all(colnames(all_bc)[other_indices] != study_samples))
-
-    different_distances <- as.matrix(dist_matrix)[study_indices, other_indices]
-    study_dist_list[[as.character(study_id)]] <- different_distances
-  }
-  return(study_dist_list)
-}
-
-# extract distances
-l.sm <- same_study_distances(dist_matrix = all_bc,
-                                             meta =  meta)
-l.diff <- different_study_distances(dist_matrix = all_bc, 
-                                                       meta = meta)
-
-# format to perform t-test
+source("/Scripts/compare.groups.r")
+l.sm <- distance.between.groups(dist.matrix = all_bc,
+                                meta =  meta, 
+                                variable.study = "Study",
+                                same = T)
+l.diff <- distance.between.groups(dist.matrix = all_bc,
+                                meta =  meta, 
+                                variable.study = "Study",
+                                same = F)
 sm<-l.sm %>%
   unlist(recursive = F) %>%
   as.vector()

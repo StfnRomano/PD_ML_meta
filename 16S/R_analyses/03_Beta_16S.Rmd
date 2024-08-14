@@ -54,49 +54,20 @@ Use BC dissimilarities
 ```{r, fig.width = 10, fig.height = 10}
 all_phylo<-phyloseq(otu_table(all.g,taxa_are_rows = T), sample_data(meta))
 all_bc<-phyloseq::distance(all_phylo, method = "bray")
+#####################################
+# Compare within vs between distances
+#####################################
+source("/Scripts/compare.groups.r")
+l.sm <- distance.between.groups(dist.matrix = all_bc,
+                                meta =  meta, 
+                                variable.study = "Study_2",
+                                same = T)
+l.diff <- distance.between.groups(dist.matrix = all_bc,
+                                meta =  meta, 
+                                variable.study = "Study_2",
+                                same = F)
 
-# Function to extract distances between samples belonging to the same group
-same_study_distances <- function(dist_matrix, meta) {
-  study_dist_list <- list()
-  unique_studies <- unique(meta$Study)
-  for (study_id in unique_studies) {
-    study_samples <- subset(meta, Study == study_id)$SampleID
-    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples)
-    stopifnot(all(colnames(all_bc)[study_indices] == rownames(all_bc)[study_indices]))
-
-    study_distances <- as.matrix(dist_matrix)[study_indices, study_indices]
-    study_dist_list[[as.character(study_id)]] <- study_distances
-  }
-  return(study_dist_list)
-}
-
-# Function to extract distances between samples belonging to different groups
-different_study_distances <- function(dist_matrix, meta) {
-  study_dist_list <- list()
-  unique_studies <- unique(meta$Study)
-  for (study_id in unique_studies) {
-    study_samples <- subset(meta, Study == study_id)$SampleID 
-    study_indices <- which(colnames(as.matrix(dist_matrix)) %in% study_samples) # this is a square matrix
-    other_indices <- which(!(colnames(as.matrix(dist_matrix)) %in% study_samples))
-    stopifnot(all(colnames(all_bc)[other_indices] != study_samples))
-
-    different_distances <- as.matrix(dist_matrix)[study_indices, other_indices]
-    study_dist_list[[as.character(study_id)]] <- different_distances
-  }
-  return(study_dist_list)
-}
-
-# Example usage
-l.sm <- same_study_distances(dist_matrix = all_bc,
-                                             meta =  meta)
-l.diff <- different_study_distances(dist_matrix = all_bc, 
-                                                       meta = meta)
-
-# Add here a double double check
-w<-unique(l.sm$Wallen_2022 %>% rownames(), l.sm$Wallen_2022 %>% colnames())
-meta.w<-subset(meta, Study == "Wallen_2022")
-stopifnot(all(w == meta.w$SampleID))
-
+  
 sm<-l.sm %>%
   unlist(recursive = F) %>%
   as.vector()
@@ -107,8 +78,6 @@ bet<-l.diff %>%
 df.compare<-data.frame(dist = c(sm,bet),
                        wb = c(rep("Within Studies", length =  length(sm)),
                               rep("Between Studies", length = length(bet))))
-
-my_comparisons = list( c("Within Studies", "Between Studies"))
 t.test(df.compare$dist ~ df.compare$wb, var.equal = T)
 
 df.compare$wb<-factor(df.compare$wb, 
@@ -140,7 +109,7 @@ ggplot(df.comp.all, aes(wb, dist)) +
                             textParams    = list(size = 6,
                             colour= "black"))  
 
-ggsave("~/Documents/EMBL_ML_PD/16S/R_analyses/Figures//Dist.bet.with.all.svg", 
+ggsave("/16S/R_analyses/Figures//Dist.bet.with.all.svg", 
        width = 8, height = 5, device = "svg")
 ```
 
