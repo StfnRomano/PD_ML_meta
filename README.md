@@ -25,9 +25,11 @@ Each dataset was profiled indipendently. In addition, samples sequenced on diffe
 #### Taxonomic profiling of shotgun metagenomic seqeunces
 Taxonomic profiling of the shotgun metagenomic sequences were performed using mOTUs_v3 https://github.com/motu-tool/mOTUs.
 Each dataset was profile indipendently using the command:
+
 e.g. `motus profile -s [NAME_INPUT].fastq.gz -o [NAME_OUTPUT].v3.motus -n [NAME_INPUT] -g 2 -l [LENGHT e.g. 50] -c`
 
 Samples profiles were then merged using:
+
 e.g. `motus merge -i [NAME_INPUT] > [NAME_OUTPUT]_all_samples.v3.g2_l75.motus`
 
 #### Functional profiling of shotgun metagenomic seqeunces
