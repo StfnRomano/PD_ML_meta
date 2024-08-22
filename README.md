@@ -18,11 +18,11 @@ bioRxiv 2023.12.05.569565; doi: https://doi.org/10.1101/2023.12.05.569565
 
 ### Taxonomic and functional profiling
 
-#### Taxonomic profiling of 16S amplicon seqeunces
+#### Taxonomic profiling of 16S amplicon sequences
 16S amplicon seqeunces were profiled using DADA2 following the authors guidelines accessible at https://benjjneb.github.io/dada2/tutorial.html
 Each dataset was profiled indipendently. In addition, samples sequenced on different runs were profiled independently to allow a run-specific estimation of the sequencing error rates.
 
-#### Taxonomic profiling of shotgun metagenomic seqeunces
+#### Taxonomic profiling of shotgun metagenomic sequences
 Taxonomic profiling of the shotgun metagenomic sequences were performed using mOTUs_v3 https://github.com/motu-tool/mOTUs.
 Each dataset was profile indipendently using the command:
 
@@ -32,7 +32,7 @@ Samples profiles were then merged using:
 
 e.g. `motus merge -i [NAME_INPUT] > [NAME_OUTPUT]_all_samples.v3.g2_l75.motus`
 
-#### Functional profiling of shotgun metagenomic seqeunces
+#### Functional profiling of shotgun metagenomic sequences
 Quality and host-filtered reads were aligned to the reduced GMGC (downlodabel from https://github.com/zellerlab/cayman).
 Resulting bam files were then processed using gffquant (https://github.com/cschu/gff_quantifier) to obtain final abundance tables.
 
