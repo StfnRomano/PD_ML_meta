@@ -4,7 +4,6 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-Load data
 # motus
 ```{r}
 library(ggplot2)
@@ -42,7 +41,7 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-KOpath
+# KOpath
 ```{r}
 
 df.cross<-readRDS("/metaG//R_analyses/Functions/KOpath//RDS/df.DA.rds")
@@ -75,7 +74,7 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-KOpath
+# KO_modules
 ```{r}
 df.cross<-readRDS("/metaG//R_analyses/Functions/KO_modules///RDS/df.DA.rds")
 df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO_modules/RDS/Ridge_df.pos.neg.rds")
@@ -106,7 +105,7 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-KO
+# KO
 ```{r}
 df.cross<-readRDS("/metaG//R_analyses/Functions/KO///RDS/df.DA.rds")
 df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.rds")
@@ -125,7 +124,11 @@ stopifnot(all(df.cross$bin == df.pos.neg$taxa))
 df.all<-data.frame(taxa = df.cross$bins,
                    te.random = df.cross$TE.random,
                    coeff = df.pos.neg$average)
-correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.obs")
+# adjust so the pvalue is visible.
+correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "pairwise.complete.obs")
+p_value=correlation_coefficient$p.value
+pv<-ifelse(p_value == 0, paste0("<", round(log10(.Machine$double.xmin),2)), p_value)
+
 
 (kc<-ggplot(df.all, aes(te.random, -coeff)) +
   geom_point() +
@@ -133,12 +136,13 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
   geom_smooth(method='lm') +
   labs(title = "KEGG KO",
        subtitle = paste0("Correlation coefficient:", round(correlation_coefficient$estimate, 2), 
-                         "; log10(p-value): ", round(log10(correlation_coefficient$p.value), 2))) +
+                         "; log10(p-value): ", pv)) +
     xlab("Gen. Odds") +
     ylab("Average relative Ridge weights"))
+
 ```
 
-GMM
+# GMM
 ```{r}
 df.cross<-readRDS("/metaG//R_analyses/Functions/KO///RDS/df.DA.GMM.rds")
 df.pos.neg<-readRDS("/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.GMM.rds")
@@ -169,10 +173,10 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-GBM
+# GBM
 ```{r}
-df.cross<-readRDS("~/Documents/EMBL_ML_PD//metaG//R_analyses/Functions/KO///RDS/df.DA.GBM.rds")
-df.pos.neg<-readRDS("~/Documents/EMBL_ML_PD/metaG//R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.GBM.rds")
+df.cross<-readRDS("/metaG/R_analyses/Functions/KO///RDS/df.DA.GBM.rds")
+df.pos.neg<-readRDS("/metaG/R_analyses/Functions/KO/RDS/Ridge_df.pos.neg.GBM.rds")
 
 df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
 dim(df.cross)
@@ -199,10 +203,10 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-16S
+# 16S
 ```{r}
-df.cross<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/df.DA.rds")
-df.pos.neg<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/Ridge_df.pos.neg.rds")
+df.cross<-readRDS("/16S/R_analyses/RDS/df.DA.rds")
+df.pos.neg<-readRDS("/16S/R_analyses/RDS/Ridge_df.pos.neg.rds")
 
 df.pos.neg<-df.pos.neg[!duplicated(df.pos.neg$taxa),]
 dim(df.cross)
@@ -230,7 +234,7 @@ correlation_coefficient <- cor.test(-df.all$coeff, df.all$te.random, use = "all.
     ylab("Average relative Ridge weights"))
 ```
 
-Combine the plots
+# Combine the plots
 ```{r}
 # Combine plots
 combined_plot <- cowplot::plot_grid(mc, c16s, kc, kpc, kmc, gmmc, gbmc,

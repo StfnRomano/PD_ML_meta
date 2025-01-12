@@ -6,15 +6,14 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages.
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 library(tidyverse)
 
-# load my function to run siamcat
 source("/Scripts/Model_coefficient_extraction.r")
 set.seed(56987)
 
@@ -30,7 +29,7 @@ meta$Study<-as.character(meta$Study)
 ## Load LOG models
 
 ```{r}
-load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log.w2500.2x5.RData")
 
 lridge<-coefficient.extraction(studies = unique(meta$Study) %>% as.character(),
                                 list.models = ridge_5x10,

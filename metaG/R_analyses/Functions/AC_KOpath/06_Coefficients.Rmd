@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
@@ -16,14 +16,13 @@ source("/Scripts//Model_coefficient_extraction.r")
 set.seed(56987)
 ```
 
-# KOpath
-## Load metadata
+# Load metadata
 ```{r}
 meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 meta$Study<-as.character(meta$Study)
 ```
 
-## Load models
+# Load models
 ```{r}
 load("/metaG/R_analyses/Functions/AC_KOpath//RData/metaG_Sinlge_5perc_log.RData")
 

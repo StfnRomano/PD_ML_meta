@@ -3,23 +3,15 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-# ---
-title: "16S_ML"
-author: "SRomano"
-date: "15/11/2021"
-output: html_document
-editor_options: 
-  chunk_output_type: console
----
 
-Load the required packages.
+# Load packages.
 
 ```{r setup, include=FALSE}
 library(phyloseq)
 library(dplyr)
 library(mlr3)
 library(SIAMCAT)
-# load my function to run siamcat
+# load functions to run siamcat
 source("/Scripts/Siamcat_wf.r")
 source("/Scripts/Cross_study_validation.r")
 set.seed(56987)
@@ -32,7 +24,7 @@ load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RDat
 ## Load data
 ```{r}
 all.tss<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
-all.tss.store<-all.tss # add that just to avoid changing all the names from the old script
+all.tss.store<-all.tss # add this for consistency
 meta<-readRDS("/metaG/R_analyses/Taxonomy//RDS/meta.rds")
 ```
 

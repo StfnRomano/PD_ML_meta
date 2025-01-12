@@ -4,35 +4,35 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-
+# load data and create df
 ```{r}
 df.perc<-data.frame(Microbiome.features = c("KO", "KO_mod", "KO_path", "GMM", "GBM", "mOTUs"),
                     prop.conf = vector(length = 6))
 
 
 # KO
-load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KO_lmm.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KO_lmm.RData")
 df.conf$type<-rep("KO", nrow(df.conf))
 df.form<-df.conf
 df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.KO.rds")
 df.perc$prop.conf[1]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 
 # K_mod
-load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOm_lmm.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOm_lmm.RData")
 df.conf$type<-rep("KO_mod", nrow(df.conf))
 df.form<-rbind.data.frame(df.form, df.conf)
 df.sign<-readRDS("metaG/R_analyses/Functions/AB_KOmod//RDS/df.sign.KOmod.rds")
 df.perc$prop.conf[2]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 
 # k_path
-load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_KOp_lmm.RData")
 df.conf$type<-rep("KO_path", nrow(df.conf))
 df.form<-rbind.data.frame(df.form, df.conf)
 df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
 df.perc$prop.conf[3]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 
 # GMM
-load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GMM_lmm.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_GMM_lmm.RData")
 df.conf$type<-rep("GMM", nrow(df.conf))
 df.form<-rbind.data.frame(df.form, df.conf)
 df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GMM.rds")
@@ -46,7 +46,7 @@ df.sign<-readRDS("metaG/R_analyses/Functions/KO/RDS/df.sign.GBM.rds")
 df.perc$prop.conf[5]<-round(nrow(df.conf)/nrow(df.sign)*100, digits = 1)
 
 # motus
-load("metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_tax_lmm.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/Potentially_confounding_Boktor_tax_lmm.RData")
 df.conf$type<-rep("mOTUs", nrow(df.conf))
 df.form<-rbind.data.frame(df.form, df.conf)
 df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")

@@ -111,7 +111,7 @@ siamcat.wf.parallel<-function(numCores = 5,  # these are the options for the par
           print(list.of.seeds[nC+(i^3)])
           f.f[[i]]<-foreach (nC=1:numCores, .packages=c("SIAMCAT", "mlr3", "mlr3learners", "mlr3extralearners"), .verbose = verbose) %dopar% { 
             set.seed(list.of.seeds[nC+(i^3)])
-            # to debug
+            # useful to debug
             list.of.seeds[nC+(i^3)]
             nC+(i^3)
 

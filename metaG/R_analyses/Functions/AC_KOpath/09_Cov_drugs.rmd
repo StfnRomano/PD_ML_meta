@@ -12,7 +12,7 @@ library(tidyverse)
 library(leaps)
 set.seed(123)
 
-m.w <- read_excel("Source_Data_24Oct2022_Wallen.xlsx", sheet = "subject_metadata")
+m.w <- read_excel("/Source_Data_24Oct2022_Wallen.xlsx", sheet = "subject_metadata")
 names(m.w)
 
 ```
@@ -39,7 +39,7 @@ m.w.f<-m.w[,c("sample_name", "Case_status", m.filt$meds)]
 
 Match ids with sample names
 ```{r}
-meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 meta.w<-subset(meta, Study == "Wallen_2022")
 
 # join the two
@@ -107,14 +107,14 @@ Load data and sign data and make models
 
 ## KO path
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -141,14 +141,14 @@ kopath<-lm.medications(microb.feats = log_kop,
 
 ## KO mod
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/all_no0_TSS_KOmod.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AB_KO_modules/RDS/all_no0_TSS_KOmod.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -175,14 +175,14 @@ komod<-lm.medications(microb.feats = log_kop,
 
 ## KO
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -208,14 +208,14 @@ ko<-lm.medications(microb.feats = log_kop,
 
 ## Taxa
 ```{r}
-kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+kop<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+df.sign<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -241,14 +241,14 @@ tax<-lm.medications(microb.feats = log_kop,
 
 ## GMM
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AA_KO//RDS/GMM.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AA_KO//RDS/GMM.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -274,14 +274,14 @@ gmm<-lm.medications(microb.feats = log_kop,
 
 ## GBM
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/KO/RDS/GBM.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/KO/RDS/GBM.rds")
 # select samples
 dim(kop)
 kop<-kop[,meta.w$SampleID]
 dim(kop)
 
 # subset only the functions of interest
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
 kop<-kop[df.sign$bins,]
 dim(kop)
 all(rownames(kop) == df.sign$bins)
@@ -306,5 +306,5 @@ gbm<-lm.medications(microb.feats = log_kop,
 ```
 # Save
 ```{r}
-save.image("metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
+save.image("/metaG/R_analyses/Functions/AC_KOpath/RData/Confounding_wallen_alldrugs15_leaps.RData")
 ```

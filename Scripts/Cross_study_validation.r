@@ -93,8 +93,7 @@ cross.study.validation<-function(list.models,
           l_prediction <- lapply(l_train, function(x) {
             make.predictions(x, siamcat.holdout = sc.obj.test)
           })
-          # the function below extracts the pred_matrix from the csv, it combine them in a df, calculate average,
-          # uses this to calculate auc using as a reference the original meta data of the testing set
+          
           roc<-calculate.roc(l_prediction, meta.test, auc.plot = auc.plot, direction=direction) 
           # prepare a vector containing the details of the tests
           out<-c(train, test.study, as.double(roc$auc))
@@ -139,8 +138,6 @@ cross.study.validation<-function(list.models,
           # make prediction with each model in the list of training data
           prediction <- make.predictions(l_train, siamcat.holdout = sc.obj.test)
         
-          # the function below extracts the pred_matrix from the csv, it combine them in a df, calculate average,
-          # uses this to calculate auc using as a reference the original meta data of the testing set
           roc<-evaluate.predictions(prediction) 
           # prepare a vector containing the details of the tests
           out<-c(train, test.study, as.double(roc@eval_data$auroc))
@@ -190,13 +187,12 @@ cross.disease.pred<-function(list.of.csv.models,
      # Extract the probability limit
      #######################################
       sp<-t.auc$specificities # here we extract the specificity from the auc predictions
-      m<-which.min(abs(sp - 0.9)) # FPR is 1-specificity. Hence we select the index of 0.9 
+      m<-which.min(abs(sp - 0.9))
       fpr.value<-abs(1-sp)[m] # get the index that we are actually selecting
       # extract the threshold that correspond to 10% FPR
       tr<-t.auc$thresholds[m]
       threshold.train<-tr
       # now use this threshold to see how many samples were predicted above this in the testing data set of the other disease
-      # The models in the testing data are also performed X times independently. There is also a roc object in this that is the evaluation of training on testing
       mod<-list.of.csv.models[[i]]
       for(t in 1:length(mod)){
         train_vs_test<-names(mod)[t]

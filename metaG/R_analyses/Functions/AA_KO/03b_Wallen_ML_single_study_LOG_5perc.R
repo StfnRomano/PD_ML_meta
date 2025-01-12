@@ -1,4 +1,4 @@
-## ----setup, include=FALSE------------------------------------------------------------------------
+## ----setup
 list.of.packages <- c("dplyr", "vegan", "BiocManager", "mlr3")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -16,7 +16,6 @@ library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 
-# load my function to run siamcat
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
   stop("At least one argument must be supplied (R_analyses dir).n", call.=FALSE)
@@ -46,7 +45,7 @@ rownames(meta)<-meta$SampleID
 
 min<-min(unique(as.vector(as.matrix(all.tss)))[unique(as.vector(as.matrix(all.tss))) != 0])/100
 
-# I do not colelct the AUC because this are single models
+# I do not collect the AUC because this are single models
 print("Running Lasso")
 lasso_5x10<-siamcat.wf.lists(vector.names = study,
                        numCores = 0, df = all.tss, meta = meta, name.feat = "PD",  filt.method = "pass", 
@@ -55,7 +54,7 @@ lasso_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 0, 
                        perform.selection = TRUE,
-                       param.selection = list(no_features = 600, method = "AUC", direction="absolute"))
+                       param.selection = list(no_features = 2500, method = "AUC", direction="absolute"))
 
 print("Running lasso_ll")
 lassoll_5x10<-siamcat.wf.lists(vector.names = study,
@@ -65,7 +64,7 @@ lassoll_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 0,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 print("Running ridge")
 ridge_5x10<-siamcat.wf.lists(vector.names = study,
@@ -75,7 +74,7 @@ ridge_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 0,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 
 print("Running ridge_ll")
@@ -86,7 +85,7 @@ ridge_ll_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 0,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 
 print("Running enet")
@@ -98,7 +97,7 @@ enet_5x10<-siamcat.wf.lists(vector.names = study,
                        max.show = 100, name.study.var = "Study",
                        param.set=list('alpha'=0.5), reps = 0,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 
 print("Running randomForest")
@@ -109,7 +108,7 @@ rf_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 0,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 
 ## ------------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-Load data
+# Load data
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -15,7 +15,7 @@ df.sign<-readRDS("/metaG//R_analyses/Functions/AB_KOmod/RDS/df.sign.KOmod.rds")
 meta$PD[meta$PD == "HC"]<-"CTRL"
 ```
 
-Format
+# Format
 ```{r}
 
 #Single study ODD Ratio 
@@ -45,7 +45,7 @@ for(i in 1:nrow(df.sign.uniq)){
 df.sign.uniq$bin<-factor(df.sign.uniq$bin, levels = unique(df.sign.uniq$bin))
 
 
-# add the ML coefficinets
+# add the ML coefficients
 df.pos.neg<-readRDS("/metaG//R_analyses/Functions/AB_KOmod/RDS//Ridge_df.pos.neg.rds")
 df.pos.neg<-subset(df.pos.neg, taxa %in% df.sign$bins)
 

@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(mlr3)
@@ -16,7 +16,6 @@ library(SIAMCAT)
 require(mlr3extralearners)
 library(ggplot2)
 
-# load my function to run siamcat
 source("/Scripts/Cross_study_validation.r")
 source("/Scripts/Siamcat_wf.r")
 
@@ -133,16 +132,14 @@ cross.disease.pred<-function(list.of.csv.models,
       t.auc<-eval_data(list.train.models[[i]])$roc
       size.train<-list.train.models[[i]]@label$label %>% length()
       train.auc<-t.auc$auc %>% as.double()
-      # Specificity measures the proportion of true negatives that are correctly identified by the model. 
       sp<-t.auc$specificities # here we extract the specificity from the auc predictions
       
-      m<-which.min(abs(sp - 0.9)) # FPR is 1-specificity. Hence we select the index of 0.9 for the 10% fpr
-      # FPR = 1 - specificity
+      m<-which.min(abs(sp - 0.9)) 
       fpr.value<-abs(1-sp)[m] # get the fpr value for that we are actually selecting, as a double check
       # extract the threshold that correspond to 10% FPR
       tr<-t.auc$thresholds[m]
       threshold.train<-tr
-      # now use this threshold to see how many samples were predicted above this in the testing data set of the other disease
+      # now use this threshold to see how many samples were predicted above it in the testing data set of the other disease
    
       mod<-list.of.csv.models[[i]]
       for(t in 1:length(mod)){
@@ -154,7 +151,7 @@ cross.disease.pred<-function(list.of.csv.models,
         prot.average<-apply(pro.test, 1, mean)
         x<-prot.average[prot.average >= tr] # select all probabilities >= to the 10% FPR threshold
         # calculate prediction rates (ration of samples > threshold and total sample in testing data)
-        pr<-(length(x)/length(prot.average))*100 # prob vector contains all values for all samples in the testing set. So has the same length of testing set.
+        pr<-(length(x)/length(prot.average))*100 # prob vector contains all values for all samples in the testing set. 
         
         tmp<-c(training.data, 
                size.train,
@@ -184,17 +181,15 @@ cross.disease.pred<-function(list.of.csv.models,
 
 # Load LOSO models
 ```{r}
-r_5x10<-readRDS("16S/R_analyses/RDS/16S_loso.ridge.rds")
+r_5x10<-readRDS("/16S/R_analyses/RDS/16S_loso.ridge.rds")
 ```
 
 # Run the new models
 
 ```{r}
-
-
 # load other diseases
 all.tss<-readRDS("16S/01_16S_databases/AD_MS_GTDB2017/RDS/all_g_TSS.rds")
-all.tss.store<-all.tss # add that just to avoid changing all the names from the old script
+all.tss.store<-all.tss # add that this for consistency
 meta<-readRDS( "16S/R_analyses_AD/RDS/meta_ad.rds")
 meta$PD<-as.character(meta$PD)
 # specify that not diseases are HC and other diseases are disease
@@ -238,6 +233,6 @@ df_ridge<-cross.disease.pred(list.of.csv.models = cdv_r5x10,
 df_ridge$prev<-rep("5% in 10", nrow(df_ridge))
 df_ridge$ML<-rep("ridge", nrow(df_ridge))
 df_ridge$LOSO<-rep("LOSO.LO", nrow(df_ridge))
-saveRDS(df_ridge, "16S/R_analyses_AD/RDS/LOSO_CDV.rds")
+saveRDS(df_ridge, "/16S/R_analyses_AD/RDS/LOSO_CDV.rds")
 
 ```

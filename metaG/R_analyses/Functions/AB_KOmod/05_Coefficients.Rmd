@@ -6,33 +6,20 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "BiocManager", "tidyverse")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
-list.of.bioc <- c("phyloseq")
-new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages)) BiocManager::install(new.packages)
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 library(tidyverse)
 
-# load my function to run siamcat
 source("/Scripts/Model_coefficient_extraction.r")
 set.seed(56987)
 
 ```
 
-# KOmod
-
-## Load metadata
+# Load metadata
 ```{r}
 meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 meta$Study<-as.character(meta$Study)
@@ -53,7 +40,7 @@ df1<-do.call(rbind, lridge) %>% as.data.frame()
 
 ```
 
-## Format dfs
+# Format dfs
 ```{r}
 # add a dummy variable 
 df1$dummy<-rep(1, nrow(df1))

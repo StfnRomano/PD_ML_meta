@@ -5,14 +5,13 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-
+# Load packages
 ```{r}
 library(dplyr)
 ```
 
 # Load + format for plotting
 ```{r}
-
 perf_sing_log<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
 #take only 5%
 perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")

@@ -100,7 +100,7 @@ ids<-tmp.weights[order(tmp.weights$n,tmp.weights$average,decreasing = T),]$short
 df.weight$shortn<-factor(df.weight$shortn, levels = ids, ordered = T)
 
 # make a plot
-# change the direction of the coeff
+# format direction of the coeff
 df.weight$mean.rel.weight<-df.weight$mean.rel.weight*-1
 df.weight$Disc<-ifelse(df.weight$mean.rel.weight < 0, "CTR", "PD")
 
@@ -158,7 +158,6 @@ gg<-cowplot::plot_grid(ga, mat,
                    labels = "auto", 
                    label_size = 18,
                    label_x = c(-0.01, -0.019), align = "h", axis = "b")
-gg
 
 ggsave(gg, 
        file = "/metaG/R_analyses/Taxonomy/Figures/single.auc.bloking.100mods.heat.svg", 

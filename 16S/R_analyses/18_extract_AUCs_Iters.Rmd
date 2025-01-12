@@ -7,17 +7,19 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(tidyverse)
 library(mlr3)
 library(SIAMCAT)
 ```
-Load work space     
+
+# Load and process CV
+## Load work space     
 ```{r}
 path.in<-"/16S/R_analyses/RData/16S_Sinlge_5perc_log.RData" 
-path.out<-"~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/"  
+path.out<-"/16S/R_analyses/RDS/"  
 alg<-"ridge" 
 
 message(paste0("The RData object with the models you specified is ", path.in))
@@ -77,8 +79,9 @@ df.mean<-df.aucs %>%
 saveRDS(df.mean, file = paste0(path.out, "/AUCs.per1X10CV.mean.", alg,".rds"))
 
 ```
-Load and process LOSO
-Load work space for the single study models    
+
+# Load and process LOSO
+## Load work space for the single study models    
 ```{r}
 path.in<-"/16S/R_analyses/RDS/16S_loso.ridge.rds" 
 path.out<-"/16S/R_analyses/RDS/" 

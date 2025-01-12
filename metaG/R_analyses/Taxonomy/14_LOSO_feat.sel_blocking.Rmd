@@ -63,7 +63,7 @@ for(i in 1:length(l.loso.100.top20)){
   message("---> check feats were extracted correctly")
   stopifnot(all(rownames(all.tss) == feats))
 
-  # LOSO is run once at the time for the Study left out in feat sel. 
+  # LOSO is run one at the time for the Study left out in feat sel. 
   # Results are then appended to a list.
   message("Run loso on 20 best feats and testing on ", study)
 
@@ -80,7 +80,7 @@ for(i in 1:length(l.loso.100.top20)){
                            case = "PD",
                            n.p=2,
                            norm.margin = 1) 
-  message("---> appening results to a list")
+  message("---> appending results to a list")
   l.loso.100.top20[[i]]<-loso
 
 }

@@ -10,8 +10,6 @@ editor_options:
 ```{r}
 library(ggplot2)
 library(dplyr)
-library(Hmisc)
-
 ```
 
 # metaG
@@ -51,28 +49,30 @@ df.csv.m<-df.scv %>%
 df.tt<-data.frame(AUC = c(ls.out$AUC, df.csv.m$AUC),
                   method = as.factor(c(rep("LOSO", 7), rep("CSV", 7))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
 # t-test compare CSV vs CV
 df.tt<-data.frame(AUC = c(df.csv$AUC, subset(df_comb, method == "CV")$AUC),
                   method = as.factor(c(rep("CSV", 42), rep("CV", 7))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
 
 ```
 
-# Check relationship between AUCs and number of samples
+## Check relationship between AUCs and number of samples
 ```{r}
 meta.m<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 sampl<-meta.m %>%
   group_by(Study) %>%
   summarise(n = n())
 
+#################
+# Corr tests
+#################
+
 # CSV
-# test associations
 df.csv.m<-left_join(df.csv, sampl, by = c("training.data" = "Study"))
 cor.test(df.csv.m$AUC, df.csv.m$n, method=c("pearson"))
 
-#################
-# Corre tests
-#################
 # LOSO
 cor.test(ls.out$AUC, ls.out$n.samples, method=c("pearson"))
 # CV
@@ -112,6 +112,7 @@ mycolors <- colorRampPalette(brewer.pal(8, "Set2"))(nb.cols)
   
   
 ```
+
 ## Plots
 ```{r}
 # create a df to plot mean and stdv
@@ -168,7 +169,7 @@ df.mean.std.csv <- subset(df_comb, method == "CSV") %>%
                                 ymin = mean - stdev, ymax = mean + stdev), 
                   width = 0,  color = "darkgray", size = 1.25,
                   position = position_dodge(width = 0.9)) +
-      # add stats summaries
+    # add stats summaries
     geom_point(data = df.mean.std.csv, 
                mapping = aes(testing.data, 
                            mean),
@@ -291,11 +292,14 @@ df.csv<-subset(df_comb16, method == "CSV")
 df.tt<-data.frame(AUC = c(df.csv$AUC, subset(df_comb16, method == "CV")$AUC),
                   method = as.factor(c(rep("CSV", 272), rep("CV", 17))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
 
 # t-test compare CSV vs LOSO
 df.tt<-data.frame(AUC = c(ls.out16$AUC, subset(df_comb16, method == "CSV")$AUC),
                   method = as.factor(c(rep("LOSO", 17), rep("CSV", nrow(subset(df_comb16, method == "CSV"))))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
+
 
 # t-tes welch comparing CSV 16S and SMG 
 df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CSV")$AUC ,
@@ -303,12 +307,14 @@ df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CSV")$AUC ,
                   method = as.factor(c(rep("16S", 272), 
                                        rep("SMG", 42))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
 
 # t-tes welch comparing LOSO 16S and SMG 
 df.tt<-data.frame(AUC = c(ls.out16$AUC, ls.out$AUC),
                   method = as.factor(c(rep("16S", 17), 
                                        rep("SMG", 7))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
 
 # t-tes welch comparing CV 16S and SMG 
 df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CV")$AUC ,
@@ -316,12 +322,14 @@ df.tt<-data.frame(AUC = c(subset(df_comb16, method == "CV")$AUC ,
                   method = as.factor(c(rep("16S", 17), 
                                        rep("SMG", 7))))
 t.test(AUC ~ method, data = df.tt, var.equal = F)
+rstatix::cohens_d(AUC ~ method, data = df.tt, var.equal = F, ci = T)
+
 ```
 
 
-# Check relationship between CSV and number of samples
+## Check relationship between CSV and number of samples
 ```{r}
-meta.m<-readRDS("~/Documents/EMBL_ML_PD/16S//R_analyses/RDS/meta.rds")
+meta.m<-readRDS("/16S//R_analyses/RDS/meta.rds")
 meta.m$Study_2<-as.character(meta.m$Study_2)
 # rename samples
 
@@ -342,7 +350,7 @@ meta.m$Study_2[meta.m$Study_2 == "Lubomski"]<-"Lubomski_2022"
 meta.m$Study_2[meta.m$Study_2 == "Heintz_Bushart"]<-"Heintz_Bushart_2017"
 meta.m$Study_2[meta.m$Study_2 == "Qian"]<-"Qian_2018"
 meta.m$Study_2[meta.m$Study_2 == "Pietrucci"]<-"Pietrucci_2019"
-#
+
 
 sampl<-meta.m %>%
   group_by(Study_2) %>%
@@ -367,6 +375,9 @@ left_join(df.csv, sampl, by = c("training.data" = "Study_2")) %>%
          caption = "lm(AUC-CSV ~ n) -> n p-value 0.23") +
   xlab("training set size") +
   xlab("AUC-CSV") 
+#################
+# Corr tests
+#################
 
 # test associations
 df.csv.m<-left_join(df.csv, sampl, by = c("training.data" = "Study_2"))
@@ -408,19 +419,53 @@ cor.test(df.cv$AUC, df.cv$n, method=c("pearson"))
        shape = "Validation\nmethod"))
 ```
 
-Combine the two plots
+## Combine plots
 ```{r}
-(gg<-ggpubr::ggarrange(plotlist = list(s16.dot, smg.dot), 
-                       align = "hv", 
-                       widths = c(2,1.2),
-                       labels = "auto", 
-                       label.x = c(0.05,0.1),
-                       label.y = c(0.98, 0.98), 
-                       font.label = list(size =21)))
+# load the data of matched jo
+df.acu.jo<-readRDS("/16S/R_analyses/RDS/df.acu.matched.jo.rds")
+df.acu.jo$auc<-df.acu.jo$auc*100
 
-ggsave("/16S/R_analyses/Figures/Size_CVSCV.svg", gg, device = "svg", width = 16, height = 6)
+df.auc.jo<-data.frame(seq = c(df.acu.jo$seq, "16S", "SMG"),
+                      auc = c(df.acu.jo$auc, 
+                 subset(df_comb16, training.data == "Jo_2022" & method == "CV")$AUC,
+                 subset(df_comb, training.data == "Jo_2022" & method == "CV")$AUC),
+                      mode = c(df.acu.jo$mode, "all", "all"))
 
 
+(pjo<-ggplot(df.auc.jo, aes(mode, auc, shape = seq)) +
+  geom_point(size = 5, fill = "#E39178", color = "#E39178") +
+  scale_shape_manual(values = c(22, 23)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+        axis.text = element_text(size = 14),
+        axis.title = element_text(size = 18),
+        legend.text = element_text(size = 12),
+        legend.title = element_text(size = 16),
+        axis.title.y = element_blank(),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank() ) +
+    xlab("Samples used") +
+    ylab("AUC") +
+    ylim(c(20, 95)) +
+    labs(shape = "Data type"))
+
+
+
+(gg<-ggpubr::ggarrange(plotlist = list(s16.dot, smg.dot, pjo),
+                       align = "hv",
+                       widths = c(2,1.2, 1),
+                       labels = "auto",
+                       label.x = c(0.05,0.1, 0.1),
+                       label.y = c(0.98, 0.98, 0.98),
+                       font.label = list(size =21),
+                       ncol = 3))
+
+
+ggsave(filename = "/16S/R_analyses/Figures/Size_CVSCV_plusJo_dec24.svg", 
+        plot = gg, 
+        device = "svg", 
+        width = 20, 
+        height = 6)
 ```
 
 
@@ -528,16 +573,18 @@ df.mean.std.csv16 <- subset(df_comb16, method == "CSV") %>%
 
 ```
 
-# make a t-test for the CV 16S vs metaG
+# Compare 16S SMG
+## t-test for the CV 16S vs metaG
 ```{r}
 
 df.cv<-data.frame(AUC = c(subset(df_comb, method == "CV")$AUC, subset(df_comb16, method == "CV")$AUC),
                   seq = c(rep("smg", 7), rep("16S", 17)) )
 
 t.test(AUC ~ seq, data = df.cv, var.equal = F)
+rstatix::cohens_d(AUC ~ seq, data = df.cv, var.equal = F, ci = T)
 
 ```
-# Combine two plots
+## Combine two plots
 ```{r}
 
 (gg<-ggpubr::ggarrange(plotlist = list(p16, p), 
@@ -551,7 +598,8 @@ t.test(AUC ~ seq, data = df.cv, var.equal = F)
 ggsave("/16S/R_analyses/Figures/Fig_2_violinCSV.svg", gg, device = "svg", width = 14, height = 6)
 
 ```
-Plot the dots+StDev for CV and LOSO
+
+# Plot the dots+StDev for CV and LOSO
 ```{r}
 # metaG
 all.std<-readRDS("/metaG/R_analyses/Taxonomy/RDS/AUCs.per1X10CV.mean.ridge.rds")

@@ -6,16 +6,15 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(mlr3)
 library(SIAMCAT)
 
 
-# load my function to run siamcat
 source("/Scripts/Cross_study_validation.r")
 source("/Scripts/Siamcat_wf.r")
 

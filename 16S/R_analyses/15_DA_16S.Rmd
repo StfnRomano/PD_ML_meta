@@ -8,9 +8,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 list.of.packages <- c("dplyr", "ggplot2", "RColorBrewer", "meta", "genodds")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
@@ -27,6 +27,8 @@ set.seed(9821)
 ```
 
 # Load the data 
+
+This analysis needs to run on a named list in which each item is the abundance table of a study.
 ```{r}
 
 l_df<-readRDS("/16S/R_analyses/RDS/l.df_g_TSS.rds")
@@ -52,8 +54,6 @@ names(meta)[1]<-"Sample_ID"
 names(meta)[15]<-"Cohort"
 
 meta$PD<-factor(meta$PD, levels = c("HC", "PD"))
-
-# sort them
 # I need to transpose it for the DA
 l_df<-lapply(l_df, function(x) as.data.frame(t(x)))
 # Double check that the TSS is calculate correctly
@@ -66,12 +66,11 @@ spec<-readRDS("/16S/R_analyses/RDS/spec_5x10.rds")
 
 l_df<-lapply(l_df, function(x) x[,which(names(x) %in% spec)])
 ```
-Note, as we remove some taxa the total sum of TSS in a sample is now < 1.
 
 # Calculate DA using GenOdds
 ```{r}
 # source the function
-source("/R_analyses_metaG/Pre_processing_functions/DA_function_gen_odd.R")
+source("/Scripts/DA_function_gen_odd.R")
 
 meta<-meta[order(meta$Sample_ID),]
 meta$Cohort<-as.character(meta$Cohort)
@@ -87,7 +86,7 @@ df.cross<-calcualte_da_genOdds(list.df = l_df,
 saveRDS(df.cross, "/16S/R_analyses/RDS/df.cross.rds")
 ```
 
-## Perform meta
+# Perform meta
 ```{r}
 bins<-unique(df.cross$bin)
 

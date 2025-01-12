@@ -6,6 +6,7 @@ editor_options:
   chunk_output_type: console
 ---
 
+# Load packages
 ```{r}
 library(ggplot2)
 library(tidyverse)
@@ -17,7 +18,7 @@ library(nlme)
 # Seq depth
 ```{r}
 all<-readRDS("/16S/R_analyses/RDS/all_g_counts.rds") %>% t() %>% as.data.frame()
-meta<-readRDS("//16S/R_analyses/RDS/meta.rds")
+meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
 meta$Study_2<-as.character(meta$Study_2)
 meta$PD<-as.character(meta$PD)
 
@@ -63,8 +64,9 @@ ggplot(all.sum, aes(Study, log10(sum), fill = PD)) +
 ggsave(filename = "/16S/R_analyses/Figures/Num_reads.svg", device = "svg", width = 8.5, height = 4)
 
 ```
-#Load the data
 
+# Acc boxplots
+## Load data
 ```{r}
 # clr
 s5<-readRDS("/16S/R_analyses/RDS//Single_5per_log.rds")
@@ -79,6 +81,7 @@ s20c<-readRDS("/16S/R_analyses/RDS/Single_20per_clr.rds")
 s30c<-readRDS("/16S/R_analyses/RDS/Single_30per_clr.rds")
 ```
 
+## Format and plot
 ```{r}
 # estimate the number of features left
 length(readRDS("//16S/R_analyses/RDS/spec_5x10.rds"))
@@ -124,14 +127,14 @@ df$prev<-factor(df$prev,
         legend.title = element_text(size = 14),
         strip.text = element_text(size = 9.5)))
 
-ggsave(filename = "~/Documents/EMBL_ML_PD/16S/R_analyses/Figures/AUC_PrevMLnorm.jpg", 
+ggsave(filename = "/16S/R_analyses/Figures/AUC_PrevMLnorm.jpg", 
  	plot = g, 
  	device = "jpg", 
  	width = 8.5, height = 6)
 
 ```
 
-#CSV
+# CSV
 ```{r}
 
 perf_sing_log<-readRDS("/16S/R_analyses/RDS/Single_5per_log.rds")
@@ -208,8 +211,20 @@ df.rar2$rar<-as.numeric(df.rar2$rar)
 
 # format for t-test test
 l_df.rar<-split(df.rar2, f = as.factor(df.rar2$ML))
-l_df.rar.w<-lapply(l_df.rar, function(x) t.test(Pair(not_rar, rar) ~ 1, data = x, var.equal = F))
+
+# t-test
+l_df.rar.w<-lapply(l_df.rar, function(x) t.test(x$not_rar, x$rar, paired = T, var.equal = F))
 l_df.rar.w
+
+# Cohen's D
+l_cd<-l_df.rar.w
+for(i in 1:length(l_df.rar)){
+  tmp<-reshape2::melt(l_df.rar[[i]][,1:2])
+   l_cd[[i]]<-rstatix::cohens_d(data = tmp,
+                         formula = value~variable, 
+                         paired = T, var.equal = F, ci =T)
+}
+l_cd
 
 # check averages
 lapply(l_df.rar, function(x) x %>%
@@ -283,7 +298,7 @@ ggsave(filename = "/16S/R_analyses/Figures/Batch_correction.jpeg",
 	height = 4)
 
 # test sign of differences
-# ranodm effect
+# random effect
 l.perf<-split(perf, as.factor(perf$ML))
 
 l.aov<-l.perf
@@ -294,11 +309,13 @@ for(i in 1:length(l.perf)){
 }  
 
 l.t1<-l.aov
+l.emm<-l.t1
 for(i in 1:length(l.aov)){
   print(names(l.aov)[i])
   x <-emmeans::emmeans(l.aov[[i]], pairwise ~ batch, adjust = "fdr")
+  l.emm[[i]]<-x
   l.t1[[i]]<-x$contrasts %>% as.data.frame()
-} 
+}  
 
 df.t<-do.call(rbind, l.t1)
 df.t$ML.method<-c(rep("ENET", nrow(df.t)/6),
@@ -307,16 +324,35 @@ df.t$ML.method<-c(rep("ENET", nrow(df.t)/6),
                   rep("Random Forest", nrow(df.t)/6),
                   rep("Ridge regression", nrow(df.t)/6),
                   rep("Ridge-LibLinear", nrow(df.t)/6))
-# save table
-write.table(x = df.t,
-            file = "/16S/R_analyses/RDS/LMM.Batch.txt",
-            col.names = T,
-            row.names = F,
+# extract CI
+l.emm.ci<-lapply(l.emm, function(x) confint(x, level = 0.95)$contrasts %>%
+                       as.data.frame)
+df.emm.ci<-do.call(rbind, l.emm.ci)
+df.emm.ci$ML.method<-c(rep("ENET", nrow(df.emm.ci)/6),
+                  rep("LASSO", nrow(df.emm.ci)/6), 
+                  rep("LASSO-LibLinear", nrow(df.emm.ci)/6),
+                  rep("Random Forest", nrow(df.emm.ci)/6),
+                  rep("Ridge regression", nrow(df.emm.ci)/6),
+                  rep("Ridge-LibLinear", nrow(df.emm.ci)/6))
+# combine the dfs
+stopifnot(all(paste0(df.t$contrast, df.t$Validation.type) == paste0(df.emm.ci$contrast, df.emm.ci$Validation.type)))
+
+# merge and save
+df.emm.ci %>%
+  left_join(df.t, by = c("contrast", "ML.method")) %>%
+  select(-estimate.y, -SE.y, -df.y) %>%
+  select(-ML.method, everything(), ML.method) %>%
+  rename(estimate = estimate.x, SE = SE.x, df = df.x) %>%
+  write.table(
+            file = "/16S/R_analyses/RDS/LMM_Batch",
             quote = F,
-            sep = "\t")
+            sep = "\t",
+            row.names = F,
+            col.names = T)
 
 ```
-See effect of metadata of cv/csv aucs
+
+# See effect of metadata of cv/csv aucs
 ```{r}
 meta %>%
   group_by(Study_2, Continent) %>%
@@ -338,7 +374,7 @@ head(age)
 age<-na.omit(age)
 head(age)
 
-gen<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses/RDS/meta.diff.gender.rds")
+gen<-readRDS("/16S/R_analyses/RDS/meta.diff.gender.rds")
 head(gen)
 # remove the NA and do another ratio
 gen<-na.omit(gen) %>%
@@ -346,8 +382,6 @@ gen<-na.omit(gen) %>%
   mutate(delta.delta = lag(delta.winCases)/delta.winCases) %>%
   na.omit(gen)
 
-
-  
 
 df.comb.ag<-rbind.data.frame(
   age %>%
@@ -378,12 +412,13 @@ df.comb.ag<-rbind.data.frame(
         select(-training.data))
 
 ##################################################################
-## test associations between pop characterisitcs and AUCs 
+## test associations between pop characteristics and AUCs 
 ###################################################################
 # lm for gender train CSV
 tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "Gender")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CSV 16S and train data is ", summary(mod)$r.squared)
 r2.gender.16S.csv.train<-summary(mod)$r.squared
 
@@ -391,6 +426,7 @@ r2.gender.16S.csv.train<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "Gender")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CSV 16S and test data is ", summary(mod)$r.squared)
 r2.gender.16S.csv.test<-summary(mod)$r.squared
 
@@ -398,6 +434,7 @@ r2.gender.16S.csv.test<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "Age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CSV 16S and train data is ", summary(mod)$r.squared)
 r2.age.16S.csv.train<-summary(mod)$r.squared
 
@@ -405,6 +442,7 @@ r2.age.16S.csv.train<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "Age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CSV 16S and test data is ", summary(mod)$r.squared)
 r2.age.16S.csv.test<-summary(mod)$r.squared
 
@@ -412,6 +450,7 @@ r2.age.16S.csv.test<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "train" & val == "CV" & factor == "Gender")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CV 16S is ", summary(mod)$r.squared)
 r2.gender.16S.cv<-summary(mod)$r.squared
 
@@ -419,17 +458,17 @@ r2.gender.16S.cv<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "test" & val == "CV" & factor == "Age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CV 16S is ", summary(mod)$r.squared)
 r2.age.16S.cv<-summary(mod)$r.squared
 
-# lm E/W CSV [here there are duplicate that need to be removed]
+# ANOVA E/W CSV [here there are duplicate that need to be removed]
 tmp<-subset(df_comb, val == "CSV") 
 mod<-lm(AUC~schema, data = tmp)
 summary(aov(mod))
 message("The variance explained by W/E comb in CSV 16S is ", summary(mod)$r.squared)
 r2.ew.16S.csv<-summary(mod)$r.squared
 
-# lm E/W CV [here there are duplicate that need to be removed]
 tmp<-subset(df_comb, val == "CV") 
 mod<-lm(AUC~schema, data = tmp)
 summary(aov(mod))
@@ -447,7 +486,7 @@ df.16S<-data.frame(r2 = c(r2.gender.16S.csv.train, r2.gender.16S.csv.test,
 
 
 ###############################################################################
-# test effect of east west
+# test effect of east west + Tukey
 ################################################################################
 
 anova(aov(AUC ~ schema, data = subset(df_comb, val == "CSV")))

@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(microbiome)
@@ -38,9 +38,8 @@ if((all(meta$SampleID == names(all.g)))){
 } else {stop("meta and Abund table do not have the same samples")}
 
 ```
+
 # Clean the datasets
-remove taxa w 0 counts -> rows
-remove samples with 0 counts -> cols
 ```{r}
 if(length(which(rowSums(all.g)==0)) > 0){
   print("Removing taxa with 0 counts, most likely due to sample filtration")
@@ -59,7 +58,7 @@ if(length(all.g[, colSums(all.g)==0])  > 0){
 meta<-meta[meta$SampleID %in% names(all.g),]
 ```
 
-Remove samples with less than 2000 reads
+#Remove samples with less than 2000 reads
 ```{r}
 colSums(all.g) -> cls.g
 
@@ -87,7 +86,7 @@ all.g<-all.g[, order(names(all.g))]
 all(names(all.g) == meta$SampleID)
 ```
 
-Now save the files
+# Save the files
 ```{r}
 print("Save a count table and a proportion table")
 all.g.count<-all.g

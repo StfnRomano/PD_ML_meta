@@ -8,9 +8,9 @@ editor_options:
   chunk_output_type: console
 ---
   
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 list.of.packages <- c("tidyverse", "ggplot2", "RColorBrewer", "meta", "genodds")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
@@ -27,6 +27,8 @@ set.seed(9821)
 ```
 
 # Load the data
+This analysis needs to run on a named list in which each item is the abundance table of a study.
+
 ```{r}
 
 l_df<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/list_df_no0_KO.rds")
@@ -50,7 +52,7 @@ names(meta)<-c("Sample_ID", "PD", "Other", "Cohort")
 meta$PD<-factor(meta$PD, levels = c("HC", "PD"))
 meta<-meta[order(meta$Sample_ID),]
 
-# I need to transpose it for the DA
+# transpose for the DA
 l_df<-lapply(l_df, function(x) as.data.frame(t(x)))
 
 ```
@@ -66,7 +68,7 @@ l_df<-lapply(l_df, function(x) x[order(rownames(x)),])
 
 # Caluclate DA
 ## GenOdds
-```{r, message =F, warning =F, error=FALSE}
+```{r}
 # source the function
 source("/Scripts/DA_function_gen_odd.R")
 
@@ -182,9 +184,14 @@ for(i in 1:length(l_df_gm)){
 
 ## Calculae DA
 ### GBM
+Sort GBM entries to avoid merging dfs with wrong variable order.
+
 ```{r}
 db <- loadDB("GBMs.v1.0")
-
+r_df_gbm<-lapply(r_df_gbm, function(x){
+  tmp<-x[order(x$Module),]
+  return(tmp)
+})
 gbm<-r_df_gbm
 for(i in 1:length(r_df_gbm)){
   rownames(gbm[[i]])<-r_df_gbm[[i]]$Module

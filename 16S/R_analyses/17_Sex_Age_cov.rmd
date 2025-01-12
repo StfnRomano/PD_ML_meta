@@ -4,11 +4,12 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-
+# Load packages and meta
 ```{r}
 library(tidyverse)
+library(nlme)
 # read medata
-meta<-readRDS("16S/R_analyses/RDS/meta.rds")
+meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
 ```
 
 
@@ -35,7 +36,7 @@ lm.conf<-function(microbiome.feats = log_kop,
                    description =  vector(length = ncol(microbiome.feats)))
     l.mod.sapd<-vector(mode = "list", length = ncol(microbiome.feats))
     l.mod.pd<-vector(mode = "list", length = ncol(microbiome.feats))
-    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) #note this was adjusted in may 24
+    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID))
 
     for(i in 1:ncol(microbiome.feats)){
       id<-names(microbiome.feats)[i]
@@ -97,7 +98,7 @@ lm.conf<-function(microbiome.feats = log_kop,
 
 # Run models
 ```{r}
-kop<-readRDS("16S/R_analyses/RDS/all_g_TSS.rds")
+kop<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
 # select samples
 dim(kop)
 all(meta.all$SampleID %in% names(kop))
@@ -111,14 +112,14 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("16S/R_analyses/RDS/df.sign.rds")
+df.sign<-readRDS("/16S/R_analyses/RDS/df.sign.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
 kop<-kop[df.sign$bins,]
 all(rownames(kop) == df.sign$bins)
 
-#log transf
+#log trafo
 log_kop<-log(kop+min)
 log_kop_w<-as.data.frame(t(log_kop))
 
@@ -152,13 +153,13 @@ df.perc$pot.conf<-rep("Sex.Age", nrow(df.perc))
 df.perc$seqs<-"16S_amplicons"
 
 df.smg<-rbind.data.frame(
-  df.metag<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs_other.meds.rds"),
-  df.metag.sa<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.SexAge_bedarf.rds"))
+  df.metag<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.drugs_other.meds.rds"),
+  df.metag.sa<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.SexAge_bedarf.rds"))
 df.smg$seqs<-rep("SMG", nrow(df.smg))
 
 df.all<-rbind.data.frame(df.perc, df.smg)
 df.all
-write.table(df.all, file =  "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.all.16SSmg.txt", 
+write.table(df.all, file =  "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.all.16SSmg.txt", 
             quote = F, 
             row.names = F, 
             col.names = T, 
@@ -190,11 +191,11 @@ df.conf.form<-data.frame(Microbiome.feature = df.estimates$feats,
                          type = df.estimates$type)
 
 # Combine with metaG
-df.metag<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", header = T)
+df.metag<-read.delim("/metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", header = T)
 
 df.all<-rbind.data.frame(df.metag, df.conf.form)
 
-write.table(df.all, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_16S_SMG.txt", 
+write.table(df.all, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_16S_SMG.txt", 
             quote = F, 
             row.names = F, 
             col.names = T, 

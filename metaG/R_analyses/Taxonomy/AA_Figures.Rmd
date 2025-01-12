@@ -5,13 +5,13 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-
+# load packages
 ```{r}
 library(ggplot2)
 library(dplyr)
 ```
 
-#Load the data
+# Load the data
 
 ```{r}
 # clr
@@ -70,7 +70,7 @@ g<-ggplot(df, aes(prev, AUC, fill=norm)) +
         legend.text = element_text(size = 12),
         legend.title = element_text(size = 14),
         strip.text = element_text(size = 9.5))
-g
+
 ggsave(filename = "/metaG/R_analyses/Taxonomy/Figures/AUC_PrevMLnorm.svg", plot = g, device = "svg", width = 8.5, height = 6)
 
 ```
@@ -78,8 +78,7 @@ ggsave(filename = "/metaG/R_analyses/Taxonomy/Figures/AUC_PrevMLnorm.svg", plot 
 #CSV
 
 ```{r}
-
-perf_sing_log<-readRDS("//metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
+perf_sing_log<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
 #take only 5%
 perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
 perf_sing_log$batch<-rep("Not corrected", nrow(perf_sing_log))
@@ -203,6 +202,7 @@ saveRDS(df.comb.ag, "/metaG/R_analyses/Taxonomy/RDS/df.comb.ag.rds")
 tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "sex")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CSV SMG and train data is ", summary(mod)$r.squared)
 r2.gender.smg.csv.train<-summary(mod)$r.squared
 
@@ -211,6 +211,7 @@ r2.gender.smg.csv.train<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "sex")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CSV SMG and test data is ", summary(mod)$r.squared)
 r2.gender.smg.csv.test<-summary(mod)$r.squared
 
@@ -219,6 +220,7 @@ r2.gender.smg.csv.test<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "train" & val == "CSV" & factor == "age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CSV SMG and train data is ", summary(mod)$r.squared)
 r2.age.smg.csv.train<-summary(mod)$r.squared
 
@@ -227,6 +229,7 @@ r2.age.smg.csv.train<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, tt == "test" & val == "CSV" & factor == "age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CSV SMG and test data is ", summary(mod)$r.squared)
 r2.age.smg.csv.test<-summary(mod)$r.squared
 
@@ -235,6 +238,7 @@ r2.age.smg.csv.test<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag, val == "CV" & factor == "sex")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Gender in CV SMG is ", summary(mod)$r.squared)
 r2.gender.smg.cv<-summary(mod)$r.squared
 
@@ -243,20 +247,20 @@ r2.gender.smg.cv<-summary(mod)$r.squared
 tmp<-subset(df.comb.ag,  val == "CV" & factor == "age")
 mod<-lm(AUC~delta, data = tmp)
 summary(mod)
+confint(mod)
 message("The variance explained by Age in CV SMG is ", summary(mod)$r.squared)
 r2.age.smg.cv<-summary(mod)$r.squared
 
 
 
-# lm E/W CSV [here there are duplicate that need to be removed]
+# ANOVA E/W CSV [here there are duplicate that need to be removed]
 tmp<-subset(df_comb, val == "CSV") 
 mod<-lm(AUC~schema, data = tmp)
 summary(aov(mod))
 message("The variance explained by W/E comb in CSV 16S is ", summary(mod)$r.squared)
 r2.ew.smg.csv<-summary(mod)$r.squared
-# NS
 
-# lm E/W CV [here there are duplicate that need to be removed]
+# ANOVA E/W CV [here there are duplicate that need to be removed]
 tmp<-subset(df_comb, val == "CV") 
 mod<-lm(AUC~schema, data = tmp)
 summary(aov(mod))

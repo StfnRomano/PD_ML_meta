@@ -1,4 +1,4 @@
-## ----setup, include=FALSE------------------------------------------------------------------------
+## ----setup
 list.of.packages <- c("dplyr", "vegan", "BiocManager", "mlr3")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -16,7 +16,6 @@ library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 
-# load my function to run siamcat
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
   stop("At least one argument must be supplied (R_analyses dir).n", call.=FALSE)
@@ -32,8 +31,8 @@ all.tss<-readRDS(paste0(args, "/RDS/all_no0_TSS_KO.rds"))
 all.tss.store<-all.tss 
 meta<-readRDS(paste0(args, "/RDS/meta.rds"))
 
-# I remove Wallen from here, becuase it is too big and takes too much time
-# I will run Wallen separatelly
+# I remove Wallen from here, because it is too big and drastically increase memory requirements.
+# I will run Wallen separately
 
 st<-unique(meta$Study)[1:6]
 meta<-subset(meta, Study %in% st)
@@ -56,7 +55,7 @@ lasso_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 10, 
                        perform.selection = TRUE,
-                       param.selection = list(no_features = 600, method = "AUC", direction="absolute"))
+                       param.selection = list(no_features = 2500, method = "AUC", direction="absolute"))
 auc<-lasso_5x10@auc
 lassoo.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 
                     length(lasso_5x10)), ML = rep("lasso", length(auc)),
@@ -72,7 +71,7 @@ lassoll_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 10,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 auc<-lassoll_5x10@auc
 lassoll.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 
                     length(lasso_5x10)), ML = rep("lasso_ll", length(auc)),
@@ -88,7 +87,7 @@ ridge_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 10,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 auc<-ridge_5x10@auc
 ridge.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 
                     length(auc)), ML = rep("ridge", length(auc)),
@@ -104,7 +103,7 @@ ridge_ll_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 10,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 auc<-ridge_ll_5x10@auc
 ridgell.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 
                     length(auc)), ML = rep("ridge_ll", length(auc)),
@@ -120,7 +119,7 @@ enet_5x10<-siamcat.wf.lists(vector.names = study,
                        max.show = 100, name.study.var = "Study",
                        param.set=list('alpha'=0.5), reps = 10,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 auc<-enet_5x10@auc
 enet.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 
                     length(auc)), ML = rep("enet", length(auc)),
@@ -135,7 +134,7 @@ rf_5x10<-siamcat.wf.lists(vector.names = study,
                        raw.auc = F, plots = F,
                        max.show = 100, name.study.var = "Study", reps = 10,
                        perform.selection = TRUE, 
-                       param.selection = list(no_features = 600, method = "AUC", direction='absolute'))
+                       param.selection = list(no_features = 2500, method = "AUC", direction='absolute'))
 
 auc<-rf_5x10@auc
 rf.df<-data.frame(study = names(auc), prev = rep("5% in 2 std", 

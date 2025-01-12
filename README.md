@@ -67,11 +67,12 @@ The structure of the repository is as follow:
 │   │   ├── 12c_RatioA_CSV.R
 │   │   ├── 12d_RatioG_CSV.R
 │   │   ├── 13_ML_loso_ridge.R
-│   │   ├── 14_Coefficiens.Rmd
+│   │   ├── 14_Coefficients.Rmd
 │   │   ├── 15_DA_16S.Rmd
 │   │   ├── 16_DA_Figure.Rmd
 │   │   ├── 17_Sex_Age_cov.rmd
 │   │   ├── 18_extract_AUCs_Iters.Rmd
+│   │   ├── 19_Jo.match16S.SMG.rmd
 │   │   ├── AA_Figures.Rmd
 │   │   ├── AB_CSV_Figures.Rmd
 │   │   └── AC_metaG_16S.Rmd
@@ -80,6 +81,7 @@ The structure of the repository is as follow:
 │       ├── 02_CDV.Rmd
 │       ├── 03_CDV_LOSO.Rmd
 │       └── 04_Figure_CDV.Rmd
+├── LICENSE
 ├── metaG
 │   └── R_analyses
 │       ├── Functions
@@ -154,13 +156,13 @@ The structure of the repository is as follow:
 │           ├── AA_Figures.Rmd
 │           └── AB_CSV_metaG.Rmd
 └── Scripts
+    ├── compare.groups.r
     ├── Cross_study_validation.r
     ├── DA_function_gen_odd.R
     ├── LOSO.r
     ├── Model_coefficient_extraction.r
     ├── Prevalence_functions.r
     └── Siamcat_wf.r
-
 ```
 
 ### Packages installation
@@ -177,20 +179,21 @@ The workflow for each profile is as follows:
    * run machine learning models for each dataset
    * perform cross study validation (CSV)
    * perform leave-one-study out validation (LOSO)
-   * perform combinatoris experiment using LOSO models (only for metagenomics data)
+   * perform combinatorics experiment using LOSO models (only for metagenomics data)
    * perform feature selection and new LOSO validation (only for metagenomics data)
    * perform cross disease prediction (CDV; only for 16S amplicon data)
    * extract model coefficients (for the taxonomy profiles the coefficients have been used to build ordinations)
    * perform differential abundance (DA) analyses
    * perform confounders analyses
    * perform enrichment analysis for KO/KEGG pathways 
+   * match sample IDs between 16S and metagenomics data (possible only in one dataset) and run new ML models matching training and test splits between data types
    * combine results in figures and tables
 
 ML models built in the KO data were run in two different scripts (03a, 03b; 05a, 05b) to accommodate memory restrictions during computation.
 
 ### Package versions
 
-All data analyses were performed in R v_4.2 and using Bioconductor v_3.15. We used the following R packages: `omixerRpm v_0.3.3`, `phyloseq v_1.40`, `vegan v_2.6.4`, `genodds v_1.1.2`, `meta v_6.2.1`, `leaps v_3.1`, `SIAMCAT v_2.0`, `stats v_4.2.3`, `rtk v_0.2.6.1`, `MMUPHin v_1.10.3`, `bapred v_1.1`, `nlme v_3.1.162`, `emmeans v_1.8.5`, `performance v_0.11`, `ggplot2 v_3.4.4`, `mlr3 v_0.15`, `pROC v_1.18.0`, `mlr3extralearners v_0.6`, `coin v_1.4.2`, `ggnewscale v_0.4.9`, `cowplot v_1.1.1`, `BiocManager v_1.30.20`, `clusterProfiler v_4.4.4`
+All data analyses were performed in R v_4.2 and using Bioconductor v_3.15. We used the following R packages: `omixerRpm v_0.3.3`, `phyloseq v_1.40`, `vegan v_2.6.4`, `genodds v_1.1.2`, `meta v_6.2.1`, `leaps v_3.1`, `SIAMCAT v_2.0`, `SIAMCAT v_2.10`, `stats v_4.2.3`, `rtk v_0.2.6.1`, `MMUPHin v_1.10.3`, `bapred v_1.1`, `nlme v_3.1.162`, `emmeans v_1.8.5`, `performance v_0.11`, `ggplot2 v_3.4.4`, `mlr3 v_0.15`, `pROC v_1.18.0`, `mlr3extralearners v_0.6`, `coin v_1.4.2`, `ggnewscale v_0.4.9`, `cowplot v_1.1.1`, `BiocManager v_1.30.20`, `clusterProfiler v_4.4.4` `rstatix v_0.7.2`, `ggh4x v_0.2.5`, `RColorBrewer v_1.1.3`, `microbiome v_1.18.0`
 
 
 

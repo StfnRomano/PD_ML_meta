@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(dplyr)
 source("/Scripts/Pevalence_functions.r")
 ```
@@ -34,8 +34,6 @@ if((all(meta$SampleID == names(all.g)))){
 
 ```
 # Clean the datasets
-remove taxa w 0 counts -> rows
-remove samples with 0 counts -> cols
 ```{r}
 if(length(which(rowSums(all.g)==0)) > 0){
   print("Removing taxa with 0 counts, most likely due to sample filtration")

@@ -11,9 +11,13 @@ loso.combinatorics<-function( list.combination, # list of study combinations
                                   mot<-rownames(df)
                                   rownames(df)<-gsub("\\]", "", gsub(".* \\[", "", mot))
                                 }
+                                #####################################################
+                                # Many approaches used to build the ML were taken from SIAMCAT
+                                # Wirbel et al, 2021, Genome Biology, https://doi.org/10.1186/s13059-021-02306-1
+                                # https://github.com/zellerlab/siamcat
+                                ###################################################
                                 
-                                
-                                # function for finding best lambda - from Siamcat
+                                # function for finding best lambda [as in SIAMCAT]
                                 get.best.glmnet.lambda <- function(model, measure, min.nonzero = 5, task){
                                   idx <- which(model$model$nzero >= min.nonzero)
                                   new.model <- model$clone(deep = TRUE)

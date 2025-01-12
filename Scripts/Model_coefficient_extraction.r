@@ -19,7 +19,6 @@ coefficient.extraction<-function(studies,
         mod<-list.models@siamcat[[studies[s]]]
         l_coef<-lapply(mod, function(m) feature_weights(m))
         # the list above has X dfs with weights for the Y fold CV I need to make an average on this
-        # the df contain all the same taxa so I can simple combine them
         # calculate overall average
         df<-data.frame(taxa = rownames(l_coef[[1]]))
         for(i in 1: length(l_coef)){
@@ -35,8 +34,6 @@ coefficient.extraction<-function(studies,
       list_coeff<-vector(mode = "list", length = length(studies))
       names(list_coeff)<-studies
       for(i in 1:length(studies)){
-        # Here I grep the name of the study when is in the name of the obj at the beginning. 
-        # This means that this is the model used for training
         mod<-list.models[[grep(paste0("^",studies[[i]]), names(list.models))[1]]]@siamcat.train 
         coef<-feature_weights(mod) # this is a result of X times Y fold CV
         if(string.to.add == F){

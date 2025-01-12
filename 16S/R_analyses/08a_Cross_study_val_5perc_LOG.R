@@ -1,4 +1,4 @@
-## ----setup, include=FALSE--------------------------------------------------------------
+## ----setup
 list.of.packages <- c("dplyr", "vegan", "BiocManager", "mlr3")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -16,7 +16,6 @@ library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 
-# load my function to run siamcat
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
   stop("At least one argument must be supplied (R_analyses dir).n", call.=FALSE)

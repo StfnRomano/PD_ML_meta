@@ -1,4 +1,4 @@
-## ----setup, include=FALSE-----------------------------------------------------
+## ----setup
 list.of.packages <- c("dplyr", "vegan", "BiocManager", "mlr3")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -17,7 +17,6 @@ library(dplyr)
 library(SIAMCAT)
 require(mlr3extralearners)
 
-# load my function to run siamcat
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
   stop("At least one argument must be supplied (R_analyses dir).n", call.=FALSE)
@@ -35,7 +34,6 @@ meta<-readRDS(paste0(args, "/RDS/meta.rds"))
 
 
 ## -----------------------------------------------------------------------------
-# Filter genera by prevalence
 study<-as.character(meta$Study) %>% unique()
 spec<-readRDS(paste0(args, "RDS/spec_5x10.rds"))
 all.tss<-all.tss.store[spec,]
@@ -57,7 +55,7 @@ loso_ridge<-loso.validation( vector.names = study,
                            n.p=2,
                            norm.margin = 1,
 			   perform.selection = TRUE, 
-                       	   param.selection = list(no_features = 600, method = "AUC", direction="absolute")) 
+                       	   param.selection = list(no_features = 2500, method = "AUC", direction="absolute")) 
 saveRDS(loso_ridge, paste0(args, "/RDS/All_metaG_loso_ridge.rds"))
 
 

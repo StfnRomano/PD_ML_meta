@@ -6,7 +6,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r, root.dir}
+# Load packages
+```{r}
 library(ggplot2)
 library(dplyr)
 ```

@@ -8,9 +8,9 @@ editor_options:
   chunk_output_type: console
 ---
   
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(tidyverse)
 library(igraph)
 ```
@@ -122,8 +122,6 @@ names(df.sign.path.subst)<-c("TE.random",
 
 
 # write a loop to format a df for the igraph
-
-
 df.form.net<-format.igraph.df(df.sign.path.subst = df.sign.path.subst,
                            df.path = df.path,
                            df.mod = df.mod,
@@ -272,7 +270,7 @@ set.seed(567)
 LO = layout_with_fr(G_Grouped)
 ```
 
-### add triangle verte shape and change modules/path/ko shapes
+### add triangle vertex shape and change modules/path/ko shapes
 ```{r}
 # triangle vertex shape
 mytriangle <- function(coords, v=NULL, params) {
@@ -312,8 +310,6 @@ for(i in 1:length(shapes.d)){
 ```{r}
 V(net)$label<-df.merged$variables
 V(net)$shape<-shapes.d
-
-
 
 svg("/metaG/R_analyses/Functions/AA_KO/Figures/SS.svg")
 
@@ -372,8 +368,6 @@ df.form.net<-format.igraph.df(df.sign.path.subst = df.sign.path.subst,
 
 # remove duplicates
 df.form.net<-df.form.net [!duplicated(df.form.net[c(1,2)]),]
-
-
 
 # create a df with all the attributes for the graphs
 df.merged<-data.frame(variables = c(df.form.net$V1, df.form.net$V2),
@@ -462,7 +456,6 @@ dev.off()
 ```
 
 ## Amino acids/Vitamins
-
 ```{r}
 tt<-c("ko00472", "ko00350", "ko00740","ko00380", "ko00650")
 df.sign.path.subst<-subset(df.sign.path, ko %in% tt)
@@ -592,7 +585,6 @@ dev.off()
 ```
 
 # crate heat map
-
 ```{r}
 create.df.perc.ko<-function(list.ko,
                             path,
@@ -671,8 +663,5 @@ ggsave(filename = "/metaG/R_analyses/Functions/AA_KO/Figures/Heatmap.svg",
        width = 8.5, height = 7.5)
 
 ```
-
-
-
 
 

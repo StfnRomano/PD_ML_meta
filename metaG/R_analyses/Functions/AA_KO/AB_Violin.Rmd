@@ -6,6 +6,7 @@ editor_options:
   chunk_output_type: console
 ---
 
+# Load packages
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -30,10 +31,10 @@ gmm.csv<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/CSV_GMM_Log_df_auc.rds")
 gmm.csv<-subset(gmm.csv, ML == "ridge")
 gmm.csv$funct<-rep("GMM", nrow(gmm.csv))
 
-
-KO<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/Single_5per_log.rds")
+# KO
+KO<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/Single_5per_log.w2500.rds")
 KO$funct<-rep("KO", nrow(KO))
-load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.w2500.RData")
 df<-data.frame(
   study = rep("Wallen_2022", 6),
   prev = rep("5% in 2 std ", 6),
@@ -59,6 +60,7 @@ KO.csv<-rbind.data.frame(KO.csv, csv_wallen.out)
 KO.csv<-subset(KO.csv, ML == "ridge")
 KO.csv$funct<-rep("KO", nrow(KO.csv))
 
+# KOpath
 KOpath<-readRDS("/metaG/R_analyses/Functions/AA_KOpath//RDS/Single_5per_log.rds")
 KOpath$funct<-rep("KEGGpath", nrow(KOpath))
 KOpath.l<-readRDS("/metaG/R_analyses/Functions/AA_KOpath//RDS/All_metaG_loso_ridge.rds")
@@ -68,7 +70,7 @@ KOpath.csv<-readRDS("/metaG/R_analyses/Functions/AA_KOpath/RDS/metaG_CSV_5perc_L
 KOpath.csv<-subset(KOpath.csv, ML == "ridge")
 KOpath.csv$funct<-rep("KEGGpath", nrow(KOpath.csv))
 
-
+#GBM
 gbm<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_single_5per_log.rds")
 gbm$funct<-rep("GBM", nrow(gbm))
 gbm.l<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_loso_ridge.rds")
@@ -78,6 +80,7 @@ gbm.csv<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM_CSV_Log_df_auc.rds")
 gbm.csv<-subset(gbm.csv, ML == "ridge")
 gbm.csv$funct<-rep("GBM", nrow(gbm.csv))
 
+# KOmod
 KOm<-readRDS("/metaG/R_analyses/Functions/AB_KOmod/RDS/Single_5per_log.rds")
 KOm$funct<-rep("KEGGmod", nrow(KOm))
 KOm.l<-readRDS("/metaG/R_analyses/Functions/AB_KOmod//RDS/All_metaG_loso_ridge.rds")
@@ -87,7 +90,7 @@ KOm.csv<-readRDS("/metaG/R_analyses/Functions/AB_KOmod/RDS/metaG_CSV_5perc_Log_d
 KOm.csv<-subset(KOm.csv, ML == "ridge")
 KOm.csv$funct<-rep("KEGGmod", nrow(KOm.csv))
 
-
+# mOTUs
 tax<-readRDS("/metaG/R_analyses/Taxonomy/RDS/Single_5per_log.rds")
 tax$funct<-rep("taxonomy", nrow(tax))
 tax.l<-readRDS("/metaG/R_analyses/Taxonomy/RDS/All_metaG_loso_ridge.rds")
@@ -135,30 +138,64 @@ ggplot(df.all.test, aes(prof, AUC, fill = val)) +
 l.perf<-split(df.all.test, as.factor(df.all.test$val))
 l.emm<-vector(mode = "list", length = length(l.perf))
 names(l.emm)<-names(l.perf)
+
+
+l.mod<-l.emm
+l.emm.ci<-l.emm
+
+
 for(i in 1:length(l.perf)){
   message("Running ", unique(l.perf[[i]]$val))
   message("---> paired")
   mod<-nlme::lme(AUC ~ prof, data = l.perf[[i]], random = ~ 1 | model)
+  l.mod[[i]]<-mod
   print(car::Anova(mod))
   print(anova(mod))
   print(summary(mod))
   em<-emmeans::emmeans(object = mod, pairwise ~ prof, adjust = "fdr")
   print(em)
+  l.emm.ci[[i]]<-em
+
   l.emm[[i]]<-as.data.frame(em$contrasts)
 }
 
 df.emm<-do.call(rbind, l.emm)
-df.emm$Validation.type<-c(rep("CSV", nrow(df.emm)/3),
-				rep("LOSO", nrow(df.emm)/3), 
-				rep("within-study CV", nrow(df.emm)/3))
-write.table(df.emm, file = "/metaG/R_analyses/Functions/KO/RDS/Table.emmeans.compare.AUCs.txt",
+df.emm$Validation.type<-c(rep("CSV", 
+                              nrow(df.emm)/3),
+                          rep("LOSO", 
+                              nrow(df.emm)/3), 
+                          rep("within-study CV", 
+                              nrow(df.emm)/3))
+
+# add 95% ci
+l.emm.ci.est<-lapply(l.emm.ci, function(x) confint(x, level = 0.95)$contrasts %>%
+                       as.data.frame)
+df.emm.ci<-do.call(rbind, l.emm.ci.est)
+df.emm.ci$Validation.type<-c(rep("CSV", 
+                                 nrow(df.emm.ci)/3),
+                             rep("LOSO", 
+                                 nrow(df.emm.ci)/3), 
+                             rep("within-study CV", 
+                                 nrow(df.emm.ci)/3))
+
+# combine the dfs
+stopifnot(all(paste0(df.emm$contrast, df.emm$Validation.type) == paste0(df.emm.ci$contrast, df.emm.ci$Validation.type)))
+
+# merge
+df.emm.ci %>%
+  left_join(df.emm, by = c("contrast", "Validation.type")) %>%
+  select(-estimate.y, -SE.y, -df.y) %>%
+  select(-Validation.type, everything(), Validation.type) %>%
+  rename(estimate = estimate.x, SE = SE.x, df = df.x) %>%
+  write.table(
+            file = "/metaG/R_analyses/Functions/KO/RDS/Table.emmeans.compare.AUCs.txt",
             quote = F,
             sep = "\t",
             row.names = F,
             col.names = T)
 ```
-# Prepare dataframe needed
 
+# Prepare dataframe
 ```{r}
 df.average<-ridge.all.tax.f %>%
   group_by(profile) %>%
@@ -176,6 +213,7 @@ df.points<-data.frame(
   method = c(ridge.all.tax.f$funct, l.all$funct),
   type = c(ridge.all.tax.f$type, l.all$type) %>% as.factor())
 ```
+
 # Make violin plot
 ```{r}
 # create final df
@@ -252,8 +290,9 @@ df.mean.std.csv <- df.all%>%
 ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/Functions_Only_Violin_merged.svg", 
        width = 8, 
        height = 5) 
+```
 
-Calculate overall means
+# Calculate overall means
 ```{r}
 s16<-readRDS("/16S/R_analyses/RDS/df.comb.cv.scv.rds")
 ls16<-readRDS("/16S/R_analyses/RDS/ls.out.cv.scv.rds")

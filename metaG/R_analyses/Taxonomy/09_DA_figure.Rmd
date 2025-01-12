@@ -4,7 +4,7 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-Load data
+# Load data
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -48,7 +48,7 @@ df.sign$Family_short<-ifelse(df.sign$counts > 2, as.character(df.sign$Family), "
 
 ```
 
-Match motus with GTDB genera
+# Match motus with GTDB genera
 ```{r}
 
 
@@ -65,7 +65,7 @@ df.sign$dir[df.sign$dir == "HC"]<-"CTRL"
 
 ```
 
-Make a pretty graph
+# Make a pretty graph
 ```{r}
 
 library(RColorBrewer)
@@ -93,7 +93,7 @@ for(i in 1:nrow(df.sign)){
 # Select the taxa with opposite dir
 gen<-subset(df.sign, DA_16SSMG == "Opposite_DA")$Genus
 View(df.sign[df.sign$Genus %in% gen,])
-# This is due to the fact that there is one mOTU pos and one negative. This needs to be included in the figure
+# This is due to the fact that there is one mOTU pos and one negative. This has be included in the figure and edited afterwards for clarity.
 
 df.sign$dirDA<-rep("black", length = nrow(df.sign))
 # now add the red for the divergent mOTUs
@@ -316,7 +316,7 @@ df.sign2$Family_short<-gsub("incertae sedis", "i.s.", df.sign$Family_short %>% a
 
 df.sign.uniq<-subset(df.cross.adj[!duplicated(df.cross.adj$bin),], bin %in% df.sign$bins)
 df.sign<-df.sign[order(df.sign$TE.random, decreasing = T),]
-df.sign.uniq<-df.sign.uniq %>% arrange(factor(bin, levels = df.sign$bins)) # this works!
+df.sign.uniq<-df.sign.uniq %>% arrange(factor(bin, levels = df.sign$bins)) 
 
 df.sign.uniq$TE<-vector(length = nrow(df.sign.uniq))
 for(i in 1:nrow(df.sign.uniq)){

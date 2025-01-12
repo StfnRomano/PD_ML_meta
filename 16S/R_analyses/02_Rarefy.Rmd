@@ -6,7 +6,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages.
 
 ```{r setup, include=FALSE}
 list.of.packages <- c("dplyr", "rtk")
@@ -23,12 +23,12 @@ library(phyloseq)
 library(dplyr)
 library(rtk)
 
-d<-"//16S/R_analyses/RData/"
+d<-"/16S/R_analyses/RData/"
 dir.create(d, recursive = T)
 
 ```
 
-Load metadata + datasets
+# Load metadata + datasets
 ```{r}
 meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
 all.g<-readRDS("/16S/R_analyses/RDS/all_g_counts.rds")

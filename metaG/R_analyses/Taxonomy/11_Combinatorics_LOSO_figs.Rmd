@@ -39,7 +39,7 @@ wa$test<-rep("Wallen_2022", nrow(wa))
 # make a single df
 df.all<-rbind.data.frame(bok1, bok2, bedarf, jo, mao, qian, wa)
 ```
-Make a plot
+# Make a plot
 ```{r}
 
 (gg<-ggplot(df.all, aes(n.samples, AUC, size = trainings,
@@ -74,6 +74,7 @@ df.all$log.scale.n.sam<-scale(df.all$log.n.samp)
 
 mod2<-nlme::lme(AUC ~ log.scale.n.sam, random = ~ 1 | test, data = df.all)
 summary(mod2)
+nlme::intervals(mod2) # extract 95% ci
 
 #extract var explained
 (x<-performance::model_performance(mod2))

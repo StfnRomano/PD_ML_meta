@@ -6,10 +6,10 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
-list.of.bioc <- c("phyloseq", "grDevices", "microbiome")
+```{r setup}
+list.of.bioc <- c("phyloseq", "microbiome")
 new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
 if(length(new.packages)) BiocManager::install(new.packages)
 
@@ -28,14 +28,13 @@ library(MMUPHin)
 
 ```
 
-Load data and metadata
+#Load data and metadata
 ```{r}
 all.tss<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
 meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
 ```
 
 ## MMUPHin
-https://bioconductor.org/packages/release/bioc/vignettes/MMUPHin/inst/doc/MMUPHin.html#4_Performing_batch_(Study_2)_effect_adjustment_with_adjust_batch
 ```{r}
 mmuphin_adjusted<-adjust_batch(feature_abd = all.tss,
                                batch = "Study_2",

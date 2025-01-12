@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(phyloseq)
 library(tidyverse)
 library(ggplot2)
@@ -22,7 +22,7 @@ set.seed(56987)
 loso<-readRDS("/16S/R_analyses_AD/RDS/LOSO_CDV.left.out.rds")
 loso$LOSO<-rep("LOSO", nrow(loso))
 
-cdv<-readRDS("~/Documents/EMBL_ML_PD/16S/R_analyses_AD/RDS/CDV.rds")
+cdv<-readRDS("/16S/R_analyses_AD/RDS/CDV.rds")
 cdv$LOSO<-rep("Single-study models", nrow(cdv))
 ```
 

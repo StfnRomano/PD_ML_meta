@@ -8,6 +8,7 @@ Download metadata from here:
 https://zenodo.org/records/7183678
 https://zenodo.org/records/7246185
 
+# Load packages
 ```{r}
 library("readxl")
 library(tidyverse)
@@ -20,7 +21,7 @@ names(m.w)
 
 vars<-c(1:3, 7)
 m.w<-m.w[, vars]
-meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 meta.w<-subset(meta, Study == "Wallen_2022")
 
 # join the two
@@ -34,7 +35,7 @@ names(m.w.m)<-c("sample_name", "Case", "Sex", "Age", "SampleID", "PD", "Study")
 
 ## Boktor
 ```{r}
-m.w <- read_excel("Supplementary-Tables_Boktor/Supplementary-Tables/Table_S10 Sample-Metadata.xlsx", sheet = "reformat_to_match_ids")
+m.w <- read_excel("/Supplementary-Tables_Boktor/Supplementary-Tables/Table_S10 Sample-Metadata.xlsx", sheet = "reformat_to_match_ids")
 names(m.w)
 vars<-c(1, 13, 9, 12)
 m.w<-m.w[, vars]
@@ -51,7 +52,7 @@ m.w<-left_join(m.w, meta.b, by = c("tube_id" = "Other"))
 ```
 # Bedarf
 ```{r}
-m.bf <- read_excel("Supplementary-Tables_Boktor/Bonn_covariate_metadata.xlsx")
+m.bf <- read_excel("/Supplementary-Tables_Boktor/Bonn_covariate_metadata.xlsx")
 names(m.bf)
 vars<-c(1, 3, 4, 6,  10)
 m.bf<-m.bf[, vars]
@@ -109,7 +110,7 @@ lm.conf<-function(microbiome.feats = log_kop,
                    description =  vector(length = ncol(microbiome.feats)))
     l.mod.sapd<-vector(mode = "list", length = ncol(microbiome.feats))
     l.mod.pd<-vector(mode = "list", length = ncol(microbiome.feats))
-    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) # Note thsi was also changed in may 2024
+    stopifnot(all(rownames(microbiome.feats) == metadata$SampleID)) 
     
     for(i in 1:ncol(microbiome.feats)){
       id<-names(microbiome.feats)[i]
@@ -171,7 +172,7 @@ lm.conf<-function(microbiome.feats = log_kop,
 # Run models
 ## KOpath
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/all_no0_TSS_KOpath.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -181,7 +182,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -201,13 +202,12 @@ df.estimates<-lm.conf(microbiome.feats = log_kop_w,
                   metadata = meta.all,
                   select.desc = "description") 
 saveRDS(df.estimates, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.S4.rds")
-
 saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
 
 ```
 ## KOmod
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AB_KO_modules//RDS/all_no0_TSS_KOmod.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AB_KO_modules//RDS/all_no0_TSS_KOmod.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -217,7 +217,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -243,7 +243,7 @@ saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_b
 
 ## KO
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/all_no0_TSS_KO.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -253,7 +253,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -278,7 +278,7 @@ saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_beda
 ```
 ## Taxa
 ```{r}
-kop<-readRDS("metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
+kop<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -288,7 +288,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+df.sign<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -313,7 +313,7 @@ saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_be
 ```
 ## GBM
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GBM.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -323,7 +323,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GBM.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -348,7 +348,7 @@ saveRDS(df.estimates@df, "/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bed
 ```
 ## GMM
 ```{r}
-kop<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
+kop<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/GMM.rds")
 # select samples
 kop<-kop[,meta.all$SampleID]
 dim(kop)
@@ -358,7 +358,7 @@ min<-min[min!=0]
 min<-min[1]/10
 
 # subset sign
-df.sign<-readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
+df.sign<-readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.GMM.rds")
 df.sign<-df.sign[order(df.sign$bins),]
 kop<-kop[order(rownames(kop)),]
 
@@ -388,7 +388,7 @@ df.perc<-data.frame(Microbiome.features = c("KO", "KO_mod", "KO_path", "GMM", "G
                     prop.conf = vector(length = 6))
 
 
-df.ko<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
+df.ko<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KO_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.ko, p.value.PD.adj < 0.05))
 df.ko$type <- rep("KO", nrow(df.ko))
@@ -396,7 +396,7 @@ df.ko<-subset(subset(df.ko, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.
 a<-dim(df.ko)
 df.perc$prop.conf[1]<-round(a[1]/b[1]*100, digits = 1)
 
-df.km<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
+df.km<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOmod_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.km, p.value.PD.adj < 0.05))
 df.km$type <- rep("KO_mod", nrow(df.km))
@@ -404,7 +404,7 @@ df.km<-subset(subset(df.km, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.
 a<-dim(df.km)
 df.perc$prop.conf[2]<-round(a[1]/b[1]*100, digits = 1)
 
-df.kp<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
+df.kp<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.KOpath_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.kp, p.value.PD.adj < 0.05))
 df.kp$type <- rep("KO_path", nrow(df.kp))
@@ -412,7 +412,7 @@ df.kp<-subset(subset(df.kp, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 0.
 a<-dim(df.kp)
 df.perc$prop.conf[3]<-round(a[1]/b[1]*100, digits = 1)
 
-df.gmm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
+df.gmm<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GMM_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.gmm, p.value.PD.adj < 0.05))
 df.gmm$type <- rep("GMM", nrow(df.gmm))
@@ -421,7 +421,7 @@ a<-dim(df.gmm)
 df.perc$prop.conf[4]<-round(a[1]/b[1]*100, digits = 1)
 
 
-df.gbm<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
+df.gbm<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.GBM_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.gbm, p.value.PD.adj < 0.05))
 df.gbm$type <- rep("GBM", nrow(df.gbm))
@@ -429,7 +429,7 @@ df.gbm<-subset(subset(df.gbm, p.value.PD.adj < 0.05), p.value.sex.age.PD.adj >= 
 a<-dim(df.gbm)
 df.perc$prop.conf[5]<-round(a[1]/b[1]*100, digits = 1)
 
-df.tax<-readRDS("metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
+df.tax<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/Conf.Taxa_bedarf_SexAge.rds")
 #check sign for PD before cov
 b<-dim(subset(df.tax, p.value.PD.adj < 0.05))
 df.tax$type <- rep("mOTUs", nrow(df.tax))
@@ -443,7 +443,7 @@ df.perc$prop.conf[6]<-round(a[1]/b[1]*100, digits = 1)
 # check, format, and save
 df.perc$pot.conf<-rep("Sex.Age", nrow(df.perc))
 df.perc
-saveRDS(df.perc, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.SexAge_bedarf.rds")
+saveRDS(df.perc, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/df.perc.pd.SexAge_bedarf.rds")
 
 
 df.conf.feat<-rbind.data.frame(df.ko, df.kp, df.km, df.gbm, df.gmm, df.tax)
@@ -469,7 +469,7 @@ df.conf.form<-data.frame(Microbiome.feature = df.conf.feat$feats,
                        
                          description = df.conf.feat$description,
                          type = df.conf.feat$type)
-write.table(df.conf.form, file = "metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = F, row.names = F, col.names = T, sep = "\t")
+write.table(df.conf.form, file = "/metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = F, row.names = F, col.names = T, sep = "\t")
 
 ```
 

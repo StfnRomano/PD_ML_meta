@@ -6,7 +6,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-```{r, root.dir}
+# Load packages
+```{r}
 library(ggplot2)
 library(tidyverse)
 ```
@@ -15,7 +16,7 @@ library(tidyverse)
 
 ```{r}
 #cv
-perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AA_KO//RDS/Single_5per_log.rds")
+perf_sing_log<-readRDS("/metaG/R_analyses/Functions/AA_KO//RDS/Single_5per_log.w2500.2x5rds")
 perf_sing_log<-subset(perf_sing_log, prev == "5% in 2 std")
 
 # format to merge with the other + ad wallen
@@ -27,7 +28,7 @@ perf_log<-data.frame(
   norm = perf_sing_log$norm
 )
 
-load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.RData")
+load("/metaG/R_analyses/Functions/AA_KO/RData/metaG_Sinlge_5perc_log_Wallen.w2500.2x5.RData")
 df<-data.frame(
   training.data = rep("Wallen_2022", 6),
   testing.data = rep("Wallen_2022", 6),
@@ -124,9 +125,6 @@ df.diag<-df_comb[1:42,]
 
 ## Tile plot
 ```{r}
-
-
-
 ggplot(df_comb, aes(x =  testing.data,training.data,  fill = AUC)) +
   geom_tile(color = "black") +
   geom_text(aes(label = AUC), color = "black", size = 4) +
@@ -153,10 +151,7 @@ ggsave("/metaG/R_analyses/Functions/AA_KO/Figures/CSV_5log_GMM.svg",
        width = 10, 
        height = 8)
 
-
 ```
-
-
 
 # GBM
 

@@ -4,7 +4,7 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-Load data
+# Load data
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -15,7 +15,7 @@ df.sign<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/df.sign.KOpath.rds")
 meta$PD[meta$PD == "HC"]<-"CTRL"
 ```
 
-Make a  graph
+# Make a  graph
 ```{r}
 
 library(RColorBrewer)
@@ -174,8 +174,6 @@ write.table(df.pos.neg, "/metaG/R_analyses/Functions/AC_KOpath/df.pos.neg.KOpat.
             row.names = F,
             sep = "\t")
 ```
-
-
 
 # Save a table
 ```{r}

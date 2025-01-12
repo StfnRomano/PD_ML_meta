@@ -109,7 +109,6 @@ dim(all.g)
 
 # Detection filtration
 ## Load list_df
-Remove, taxa with 0 and samples with 0
 ```{r}
 all.g<-readRDS("/List_datasets_NB_GTDB207_25Aug2022.rds")
 

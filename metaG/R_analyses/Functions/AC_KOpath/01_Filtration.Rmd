@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 library(dplyr)
 source("/Scripts/Pevalence_functions.r")
 ```
@@ -32,8 +32,7 @@ if((all(meta$SampleID == names(all.g)))){
 
 ```
 
-remove taxa w 0 counts -> rows
-remove samples with 0 counts -> cols
+# Filter
 ```{r}
 if(length(which(rowSums(all.g)==0)) > 0){
   print("Removing taxa with 0 counts, most likely due to sample filtration")
@@ -50,7 +49,7 @@ if(length(all.g[, colSums(all.g)==0])  > 0){
 ```
 
 
-# Filtrations 
+# List 
 ```{r}
 all.g<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
 

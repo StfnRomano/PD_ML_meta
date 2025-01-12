@@ -6,9 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
+```{r setup}
 list.of.packages <- c("dplyr")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
@@ -38,8 +38,6 @@ if((all(meta$SampleID == names(all.g)))){
 
 ```
 # Clean the datasets
-remove taxa w 0 counts -> rows
-remove samples with 0 counts -> cols
 ```{r}
 if(length(which(rowSums(all.g)==0)) > 0){
   print("Removing taxa with 0 counts, most likely due to sample filtration")
@@ -81,7 +79,7 @@ for(i in 1:length(all.g)){
 
 }
 
-# here the sub-setting for the l_df was not done properly
+# adjust sub-setting for the l_df
 all.g<-lapply(all.g, function(x) x[,which(names(x) %in% meta$SampleID)])
 lapply(all.g, function(x) all(names(x) %in% meta$SampleID))
 

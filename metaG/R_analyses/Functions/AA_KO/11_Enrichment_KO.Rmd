@@ -8,7 +8,7 @@ editor_options:
   chunk_output_type: console
 ---
   
-Perform enrichment using clusterprofiler
+# Perform enrichment using clusterprofiler
 ```{r}
 # load pckgs
 library(clusterProfiler)

@@ -1,4 +1,4 @@
-## ----setup, include=FALSE------------------------------------------------------
+## ----setup
 list.of.packages <- c("dplyr", "vegan", "BiocManager", "mlr3")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -16,14 +16,13 @@ library(phyloseq)
 library(dplyr)
 library(SIAMCAT)
 
-# load my function to run siamcat
 args <- commandArgs(trailingOnly=TRUE)
 if (length(args)==0) {
   stop("At least one argument must be supplied (R_analyses dir).n", call.=FALSE)
 }
 
 
-source(paste0(args, "/scripts/Siamcat_wf.r"))
+source(paste0(args, "/Scripts/Siamcat_wf.r"))
 set.seed(56987)
 
 
@@ -35,7 +34,7 @@ meta<-readRDS(paste0(args, "/RDS/meta.rds"))
 
 ## ------------------------------------------------------------------------------
 study<-as.character(meta$Study) %>% unique()
-spec<-readRDS(paste0(args, "RDS/spec_5x10.rds"))
+spec<-readRDS(paste0(args, "/RDS/spec_5x10.rds"))
 all.tss<-all.tss.store[spec,]
 rownames(meta)<-meta$SampleID
 

@@ -6,15 +6,15 @@ editor_options:
   chunk_output_type: console
 ---
 
-# metaG
+# Load packages
 ```{r}
 library(dplyr)
 ```
 
-#Load the data
+# Load CV and CSV
 ```{r}
 
-perf_sing_log<-readRDS("//16S/R_analyses/RDS/Single_5per_log.rds")
+perf_sing_log<-readRDS("/16S/R_analyses/RDS/Single_5per_log.rds")
 #take only 5%
 perf_sing_log<-subset(perf_sing_log, prev == "5% in 10 std")
 # format to merge with the other
@@ -41,7 +41,7 @@ df_comb$AUC<-df_comb$AUC*100
 saveRDS(df_comb, "/16S/R_analyses/RDS/df.comb.cv.scv.rds")
 
 ```
-LOSO
+# LOSO
 ```{r}
 # load loso
 loso<-readRDS("/16S//R_analyses/RDS/16S_loso.ridge.rds")

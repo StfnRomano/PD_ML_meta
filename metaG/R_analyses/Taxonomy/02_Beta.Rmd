@@ -6,19 +6,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "vegan", "ggplot2", "RColorBrewer")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
-list.of.bioc <- c("phyloseq",  "grDevices", "microbiome", "ggpubr")
-new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages)) BiocManager::install(new.packages)
+```{r setup}
 library(phyloseq)
 library(dplyr)
 library(microbiome)
@@ -29,7 +19,7 @@ library(cowplot)
 set.seed(435)
 ```
 
-Load metadata + datasets
+# Load metadata + datasets
 ```{r}
 meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
 all.g<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
@@ -85,7 +75,11 @@ df.compare<-data.frame(dist = c(sm,bet),
                        wb = c(rep("Within Studies", length =  length(sm)),
                               rep("Between Studies", length = length(bet))))
 
+# t-test + Cohen's D effect size
 t.test(df.compare$dist ~ df.compare$wb, var.equal = T)
+(cd<-rstatix::cohens_d(data = df.compare,
+                         formula = dist~wb, 
+                         paired = F, var.equal = T, ci =T, nboot = 333))
 
 df.compare$wb<-factor(df.compare$wb, 
                       levels = c("Within Studies", "Between Studies"), 

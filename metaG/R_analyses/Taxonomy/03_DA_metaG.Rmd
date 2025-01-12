@@ -8,7 +8,7 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
 ```{r setup, include=FALSE}
 list.of.packages <- c("dplyr", "meta", "genodds")
@@ -27,38 +27,47 @@ set.seed(9821)
 ```
 
 
-Load the data
-
-l_df<-readRDS("metaG/R_analyses/Taxonomy/RDS/l.df_g_TSS.rds")
-meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
-
-meta %>%
-  group_by(Study, PD) %>%
-  summarise(n = n()) %>%
-  print( n = 50)
-
-dim(meta)
-lapply(l_df, dim)
-
-#check the order is the same in all
-x<-unlist(lapply(l_df, function(x) names(x)))
-all(sort(x) == sort(meta$SampleID))
-
-
-```
+# Load metadata + datasets
+This analysis needs to run on a named list in which each item is the abundance table of a study.
 
 ```{r}
-# rename to use with the genodd function
-names(meta)<-c("Sample_ID", "PD", "Other", "Cohort")
-meta$PD<-factor(meta$PD, levels = c("HC", "PD"))
-stopifnot(sort(lapply(l_df, rownames) %>% unlist()) == sort(meta$Sample_ID))
-lapply(l_df, nrow) %>% unlist() %>% sum() == nrow(meta)
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.form.rds")
+names(meta)<-c("SampleID", "PD", "Other", "Study")
+all.g<-readRDS("/metaG/R_analyses/Taxonomy/RDS/all_no0_TSS_noUnassigned.rds")
 
+# order
+all.g<-all.g[,order(names(all.g))]
+meta<-meta[order(meta$SampleID),]
+meta$PD<-factor(meta$PD, levels = c("HC", "PD"))
+
+# are all samples in meta in the OTU table?
+stopifnot(all(meta$SampleID == names(all.g)))
+message("Are all samples in meta identical to the microbiome table? ", all(meta$SampleID == names(all.g)))
+
+# rename meta for genodds
+names(meta)<-c("Sample_ID", "PD", "Other", "Cohort")
+
+# add study to the df and split in a list
+# transpose
+all.g<-as.data.frame(t(all.g))
+stopifnot(all(meta$SampleID == rownames(all.g)))
+
+all.g$study<-meta$Cohort
+l_df<-split(all.g, f = as.factor(all.g$study))
+
+
+# remove the variable study
+lapply(l_df, dim)
+l_df<-lapply(l_df, function(x){
+  x<-x[,-which(names(x) == "study")]
+  return(x)
+})
 ```
+
 # Filter
 Detection 5% in 2 studies
 ```{r}
-spec<-readRDS("metaG/R_analyses/Taxonomy/RDS/spec_5x10.rds")
+spec<-readRDS("/metaG/R_analyses/Taxonomy/RDS/spec_5x10.rds")
 
 l_df<-lapply(l_df, function(x) x[,which(names(x) %in% spec)])
 
@@ -116,13 +125,13 @@ subset(df,p.adjust<0.05 ) %>%
 df.sign<-subset(df,p.adjust<0.05 ) 
 
 df.sign$dir<-ifelse(df.sign$TE.random<0, "CTRL", "PD")
-saveRDS(df.sign, "metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
+saveRDS(df.sign, "/metaG/R_analyses/Taxonomy/RDS/df.sign.rds")
 
 ```
 
 
 # Save workspace
 ```{r}
-save.image("metaG/R_analyses/Taxonomy//RData/DA.GenOdd.RData")
+save.image("/metaG/R_analyses/Taxonomy//RData/DA.GenOdd.RData")
 ```
 

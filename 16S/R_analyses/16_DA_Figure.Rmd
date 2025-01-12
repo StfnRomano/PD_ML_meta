@@ -8,19 +8,9 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
+# Load packages
 
-```{r setup, include=FALSE}
-list.of.packages <- c("dplyr", "ggplot2", "RColorBrewer", "ggnewscale", "cowplot")
-new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
-if (!requireNamespace("BiocManager", quietly = TRUE)){
-    install.packages("BiocManager")}
-
-
-list.of.bioc <- c("grDevices")
-new.packages <- list.of.bioc[!(list.of.bioc %in% installed.packages()[,"Package"])]
-if(length(new.packages)) BiocManager::install(new.packages)
+```{r setup}
 library(dplyr)
 library(RColorBrewer)
 library(ggnewscale)
@@ -30,7 +20,7 @@ library(ggplot2)
 set.seed(9821)
 ```
 
-Load the data and format 
+# Load the data and format 
 ```{r}
 meta<-readRDS("/16S/R_analyses/RDS/meta.rds")
 df.cross<-readRDS("/16S/R_analyses/RDS/df.cross.rds")
@@ -81,7 +71,7 @@ mycolors <- colorRampPalette(brewer.pal(8, "Set3"))(l)
 # match genera DA and mOTUs DA
 mgtdb<-readRDS("/metaG/R_analyses/Taxonomy/RDS/df.sign,gtdb.rds")
 
-# Need to double check that the direction  of enrichment is the same
+# double check that the direction  of enrichment is the same
 df.sign$bold<-vector(length = nrow(df.sign))
 df.sign$DA_16SSMG<-vector(length = nrow(df.sign))
 
@@ -100,16 +90,15 @@ for(i in 1:nrow(df.sign)){
 # Select the taxa with opposite dir
 gen<-subset(df.sign, DA_16SSMG == "Opposite_DA")$bins
 View(mgtdb[mgtdb$Genus %in% gen,])
-# This is due to the fact that there is one mOTU pos and one negative. This needs to be included in the figure
+# This is due to the fact that there is one mOTU pos and one negative.
 
 df.sign$dirDA<-rep("black", length = nrow(df.sign))
-# now add the red for the divergent mOTUs
+# now add the red for the divergent mOTUs. NOTE: in the final figure this difference in color has been removed manually.
 df.sign[which(df.sign$bins %in% gen),]$dirDA<-"red"
 
 
 
 #Extract Single study DA
-
 df.cross.adj<-df.cross %>%
   group_by(Cohort) %>%
   mutate(padjust = p.adjust( p.value, method = "fdr"))

@@ -8,9 +8,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
-
-```{r setup, include=FALSE}
+# Load packages
+```{r setup}
 list.of.packages <- c("dplyr", "meta", "genodds")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
 if(length(new.packages)) install.packages(new.packages)
@@ -26,7 +25,9 @@ library(meta)
 set.seed(9821)
 ```
 
-Load the data 
+# Load the data 
+This analysis needs to run on a named list in which each item is the abundance table of a study.
+
 ```{r}
 
 l_df<-readRDS("/metaG/R_analyses/Functions/AC_KOpath/RDS/list_df_no0_KOpath.rds")
@@ -66,7 +67,7 @@ l_df<-lapply(l_df, function(x) x[order(rownames(x)),])
 
 # Caluclate DA
 ## GenOdds
-```{r, message =F, warning =F, error=FALSE}
+```{r}
 # source the function
 source("/R_analyses_metaG/Pre_processing_functions/DA_function_gen_odd.R")
 

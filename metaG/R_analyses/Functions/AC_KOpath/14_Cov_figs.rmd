@@ -4,10 +4,11 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
+
+# Load pacakgesS
 ```{r}
-library("readxl")
-library("tidyverse")
-library("ggplot2")
+library(tidyverse)
+library(ggplot2)
 library(RColorBrewer)
 library(ggnewscale)
 ```
@@ -15,7 +16,7 @@ library(ggnewscale)
 ## Match sing KO, mod and paths
 ```{r}
 # match sign KOs with path and mod
-df.sign.KO <- readRDS("metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
+df.sign.KO <- readRDS("/metaG/R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
 module_ko <- read_delim("module_ko.list", col_names = FALSE)
 names(module_ko)<-c("md", "mod", "KO")
 module_ko$mod<-gsub("\tko", "", module_ko$mod)
@@ -32,7 +33,7 @@ df.ko.mod.path<-df.sign.KO %>%
 ```
 ## Match sing mod and paths
 ```{r}
-module_p <- read_delim("metaG/R_analyses/Functions/AA_KO/Working_dir_old_files/pathway_module.list", col_names = FALSE)
+module_p <- read_delim("/metaG/R_analyses/Functions/AA_KO/Working_dir_old_files/pathway_module.list", col_names = FALSE)
 names(module_p)<-c("pt", "path", "mod")
 module_p$path<-gsub("map", "ko", gsub("\tmd", "", module_p$path))
 df.sign.m <- readRDS("metaG/R_analyses/Functions/AB_KO_modules/RDS/df.sign.KOmod.rds")
@@ -74,9 +75,9 @@ all.f.type<-c(rep("Xenobiotics", length = length(xeno)),
 
 ## Plot confounds
 ```{r}
-pd.conf<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt")
-meds.conf<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/Drugs.conf.tab_lmVScov_leaps.txt", quote = "")
-sex.age<-read.delim("metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = "")
+pd.conf<-read.delim("/metaG/R_analyses/Functions/AC_KOpath/RDS/PD.drug.confund.lmm.txt")
+meds.conf<-read.delim("/metaG/R_analyses/Functions/AC_KOpath/RDS/Drugs.conf.tab_lmVScov_leaps.txt", quote = "")
+sex.age<-read.delim("/metaG/R_analyses/Functions/AC_KOpath/RDS/Sex.Age.conf.tab_bedarf.txt", quote = "")
 ```
 ### conf PD drugs
 ```{r}
@@ -371,7 +372,7 @@ df.plot$type.conf<-factor(df.plot$type.conf, levels = c("KEGG_path", "KEGG_mod",
 cowplot::plot_grid(sexage, others.conf, pd.conf,
                    labels = "AUTO",label_size = 20, label_x = c(0.2, 0.001, 0.001), 
                    ncol = 3, rel_widths = c(1.7,1,1)) %>%
-  cowplot::ggsave2(filename = "metaG/R_analyses/Functions/AC_KOpath/Figures/Confound.heat_Sexage.svg",
+  cowplot::ggsave2(filename = "/metaG/R_analyses/Functions/AC_KOpath/Figures/Confound.heat_Sexage.svg",
                      height = 6, 
                      width = 14, 
                    device = "svg")

@@ -6,7 +6,7 @@ editor_options:
 ---
 download metadata from here https://zenodo.org/records/7183678
  
-
+# Load packages
 ```{r}
 library("readxl")
 library("tidyverse")
@@ -16,13 +16,13 @@ names(m.w)
 
 ```
 
-Select the medications
+# Select medications
 ```{r}
 vars<-c(1, 13, 21:28)
 m.w<-m.w[, vars]
 ```
 
-Match ids with sample names
+# Match ids with sample names
 ```{r}
 meta<-readRDS("metaG/R_analyses/Taxonomy/RDS/meta.rds")
 meta$Study <- as.character(meta$Study)
@@ -103,7 +103,15 @@ lm.pd.drugs<-function(log.microbiome.feats = log_kop_w,
                amantadine.est = vector(length = ncol(log_kop_w)))
 
   # create a list to store the models
-  drugs<-c("MAO_B_inhibitors", "carbidopa", "dopamine_agonists", "levodopa", "rasagiline", "ropinirole", "selegiline", "amantadine")
+  drugs<-c("MAO_B_inhibitors", 
+           "carbidopa", 
+           "dopamine_agonists", 
+           "levodopa", 
+           "rasagiline", 
+           "ropinirole", 
+           "selegiline", 
+           "amantadine")
+  
   l.mod<-vector(mode = "list", length = length(drugs))
   names(l.mod)<-drugs
   l.mod<-lapply(l.mod, function(x) vector(mode = "list", length = ncol(log_kop_w)))

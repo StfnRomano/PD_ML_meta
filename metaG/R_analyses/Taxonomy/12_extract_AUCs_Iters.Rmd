@@ -7,8 +7,8 @@ editor_options:
   chunk_output_type: console
 ---
 
-Load the required packages.
-```{r setup, include=FALSE}
+# Load packages
+```{r setup}
 library(tidyverse)
 library(mlr3)
 library(SIAMCAT)

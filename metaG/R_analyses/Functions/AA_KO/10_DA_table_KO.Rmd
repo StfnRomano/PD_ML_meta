@@ -4,7 +4,7 @@ output: html_document
 editor_options: 
   chunk_output_type: console
 ---
-Load data
+# Load data
 ```{r}
 library(ggplot2)
 library(dplyr)
@@ -16,7 +16,7 @@ df.sign<-readRDS("/metaG//R_analyses/Functions/AA_KO/RDS/df.sign.KO.rds")
 meta$PD[meta$PD == "HC"]<-"CTRL"
 ```
 
-Format
+# Format
 ```{r}
 #Single study DA
 
