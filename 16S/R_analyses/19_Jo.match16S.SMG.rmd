@@ -1,0 +1,163 @@
+---
+title: "match_jo"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+# Load pckgs
+```{r}
+library(dplyr)
+source("/Scripts/Siamcat_wf.r")
+```
+
+
+# match patients id between 16S and metaG
+```{r}
+mj<-read.delim("/Metadata/Jo_2022.txt", 
+               header = T, 
+               sep = ",")
+mj<-subset(mj, env_medium == "feces")
+unique(mj$patient.control_label)
+
+mjsmg<-read.delim("/Metadata/Jo_2022_metaG.txt", 
+                  header = T,
+                  sep = ",")
+int<-intersect(mj$patient.control_label, mjsmg$host_status)
+```
+
+# Merge dataset and extract the ids
+
+```{r}
+# subset 16S and smg
+meta.16<-mj[which(mj$patient.control_label %in% int),]
+meta.smg<-mjsmg[which(mjsmg$host_status %in% int),]
+
+# order meta based on patient No.
+meta.16<-meta.16[order(meta.16$patient.control_label),]
+meta.smg<-meta.smg[order(meta.smg$host_status),]
+int<-int[order(int)]
+stopifnot(all(meta.16$patient.control_label == meta.smg$host_status))
+stopifnot(all(meta.16$patient.control_label == int))
+
+meta.matched<-data.frame(run.16S =meta.16$Run,
+                         run.smg = meta.smg$Run,
+                         ids = int)
+```
+
+# extract samples from meta
+```{r}
+###########
+# 16S
+###########
+meta16S<-readRDS("/16S/R_analyses/RDS/meta.rds")
+meta16s.jo<-subset(meta16S, Study_2 == "Jo")
+all.16<-readRDS("/16S/R_analyses/RDS/all_g_TSS.rds")
+# match the PD form 16S 
+meta.matched<-meta.matched %>%
+  left_join(meta16s.jo[,c("SampleID", "PD")], by = c("run.16S" = "SampleID"))
+
+###########
+# SMG
+###########
+meta<-readRDS("/metaG/R_analyses/Taxonomy/RDS/meta.rds")
+meta.jo<-subset(meta, Study == "Jo_2022")
+all.smg<-readRDS("/metaG/R_analyses/Taxonomy//RDS/all_no0_TSS_noUnassigned.rds")
+
+# match the PD form SMG just to be sure all adds upp
+meta.matched<-meta.matched %>%
+  left_join(meta.jo[,c("SampleID", "PD")], by = c("run.smg" = "SampleID"))
+# add final check that all is consistent
+stopifnot(all(meta.matched$PD.x == meta.matched$PD.y))
+```
+
+# Subet profiles
+```{r}
+############
+# 16S
+###########
+spec<-readRDS("/16S/R_analyses/RDS/spec_5x10.rds")
+all.16<-all.16[spec,]
+all.16.jo<-all.16[, meta.matched$run.16S]
+stopifnot(all(names(all.16.jo) == meta.matched$run.16S))
+
+#rename
+names(all.16.jo)<-meta.matched$ids
+############
+# SMG
+###########
+spec<-readRDS("/metaG/R_analyses/Taxonomy//RDS/spec_5x10.rds")
+all.smg<-all.smg[spec,]
+all.smg.jo<-all.smg[, meta.matched$run.smg]
+stopifnot(all(names(all.smg.jo) == meta.matched$run.smg))
+names(all.smg.jo) <- meta.matched$ids
+
+# final check
+stopifnot(all(names(all.smg.jo)  == names(all.16.jo)))
+meta.matched$Study<-rep("Jo", nrow(meta.matched))
+```
+
+
+# run ML 
+```{r}
+rownames(meta.matched)<-meta.matched$ids
+############
+# 16S
+###########
+min<-min(unique(as.vector(as.matrix(all.16.jo)))[unique(as.vector(as.matrix(all.16.jo))) != 0])/100
+
+print("Running ridge")
+set.seed(356)
+ridge_5x10<-siamcat.wf(df =  all.16.jo, meta = meta.matched, name.feat = "PD.x",  name.study = "Jo", filt.method = "pass", 
+                       cutoff = 0.30, log.n0 = min, nsplit = 10, n.fold = 10, 
+                       trafo = "log.std",  ml.method = "ridge", 
+                       raw.auc = F, plots = F,
+                       max.show = 100)
+
+############
+# SMG
+###########
+min<-min(unique(as.vector(as.matrix(all.smg.jo)))[unique(as.vector(as.matrix(all.smg.jo))) != 0])/100
+
+set.seed(356)
+ridge_5x10_smg<-siamcat.wf(df =  all.smg.jo, meta = meta.matched, name.feat = "PD.x",  name.study = "Jo", filt.method = "pass", 
+                       cutoff = 0.30, log.n0 = min, nsplit = 10, n.fold = 10, 
+                       trafo = "log.std",  ml.method = "ridge", 
+                       raw.auc = F, plots = F,
+                       max.show = 100)
+```
+
+
+# Compare splits between 16S and SMG
+```{r}
+tr.16<-ridge_5x10@data_split$training.folds %>%
+  unlist(recursive = F)
+test.16<-ridge_5x10@data_split$test.folds %>%
+  unlist(recursive = F)
+
+tr.smg<-ridge_5x10_smg@data_split$training.folds %>%
+  unlist(recursive = F)
+test.smg<-ridge_5x10_smg@data_split$test.folds %>%
+  unlist(recursive = F)
+
+for(i in 1:100){
+  all(tr.16[[i]] == tr.smg[[i]]) %>%
+      stopifnot()
+  all(tr.16[[i]] == tr.smg[[i]]) %>%
+    print()
+}
+for(i in 1:100){
+  all(test.16[[i]] == test.smg[[i]]) %>%
+      stopifnot()
+  all(test.16[[i]] == test.smg[[i]])%>%
+    print()
+}
+```
+
+# extract aucs and save as df to do a figure
+```{r}
+
+df.auc<-data.frame(seq = c("16S", "SMG"),
+                   auc = c(ridge_5x10@eval_data$auroc, ridge_5x10_smg@eval_data$auroc),
+                   mode = rep("matched", 2))
+saveRDS(df.auc, "/16S/R_analyses/RDS/df.acu.matched.jo.rds")
+```
