@@ -47,6 +47,23 @@ meta %>%
   group_by(Study) %>%
   summarise(n = n())
 ```
+
+
+# Filter
+```{r}
+all.tss<-all.tss[, meta$SampleID]
+
+idx.r<-which(rowSums(all.tss) == 0)
+idx.c<-which(colSums(all.tss) == 0)
+idx.c
+all.tss<-all.tss[-idx.r, ]
+
+meta<-meta[order(meta$SampleID),]
+all.tss<-all.tss[,order(names(all.tss))]
+
+stopifnot(all(names(all.tss) == meta$SampleID))
+```
+
 # Run CDV
 ```{r}
 cdv_r5x10<-cross.study.validation(list.models = ridge_5x10,
